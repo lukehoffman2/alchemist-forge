@@ -1,0 +1,760 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Ore Mining Game - v5</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <style>
+        body { margin: 0; overflow: hidden; font-family: 'Inter', sans-serif; background-color: #1a202c; color: #e2e8f0; }
+        #game-container { width: 100vw; height: 100vh; display: block; cursor: grab; }
+        canvas { display: block; }
+        
+        /* UI Overlay */
+        #ui-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+        }
+
+        /* Inventory */
+        #inventory-display {
+            position: absolute;
+            top: 1rem;
+            left: 1rem;
+            padding: 0.75rem;
+            background-color: rgba(0,0,0,0.6);
+            border-radius: 0.5rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            pointer-events: auto;
+            width: 220px;
+        }
+        .inventory-slot {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.5rem;
+            border-radius: 0.25rem;
+            font-size: 0.9rem;
+        }
+        .inventory-slot .icon-placeholder {
+            width: 28px; height: 28px; flex-shrink: 0;
+            background-color: #4a5568; border-radius: 4px;
+            display: flex; align-items: center; justify-content: center; font-weight: bold;
+        }
+        .inventory-category {
+            font-size: 0.75rem; text-transform: uppercase; color: #a0aec0; margin-top: 0.5rem; padding-left: 0.25rem;
+        }
+
+
+        /* Message & Info Boxes */
+        #message-box {
+            position: absolute; bottom: 70px; left: 50%; transform: translateX(-50%);
+            background-color: rgba(45, 55, 72, 0.9); color: white;
+            padding: 0.75rem 1.25rem; border-radius: 0.5rem; font-size: 0.9rem;
+            text-align: center; opacity: 0; transition: opacity 0.5s ease-in-out; z-index: 100;
+        }
+        #controls-info {
+            position: absolute; bottom: 1rem; right: 1rem;
+            background-color: rgba(0,0,0,0.6); padding: 0.75rem;
+            border-radius: 0.5rem; font-size: 0.85rem;
+        }
+
+        /* Forge UI */
+        #forge-ui {
+            position: absolute; top: 1rem; right: 1rem;
+            background-color: rgba(0,0,0,0.7);
+            padding: 1rem; border-radius: 0.5rem;
+            width: 280px; pointer-events: auto;
+            display: none; /* Hidden by default */
+        }
+        #forge-ui h3 { font-size: 1.2rem; margin-bottom: 0.75rem; text-align: center; }
+        .forge-status, .smelt-option { margin-bottom: 0.5rem; }
+        .smelt-button {
+            width: 100%; text-align: left; padding: 0.5rem;
+            background-color: #4a5568; border-radius: 0.25rem;
+            cursor: pointer; transition: background-color 0.2s;
+        }
+        .smelt-button:hover { background-color: #718096; }
+        .smelt-button.disabled { background-color: #2d3748; color: #718096; cursor: not-allowed; }
+        .progress-bar { width: 100%; background-color: #2d3748; border-radius: 4px; overflow: hidden; height: 10px; }
+        .progress-bar-inner { width: 0%; height: 100%; background-color: #f59e0b; transition: width 0.2s; }
+        #add-fuel-button { width: 100%; margin-top: 0.75rem; background-color: #8B4513; }
+        
+        /* Gemini Modal */
+        #gemini-modal {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background-color: rgba(0,0,0,0.85); display: none;
+            flex-direction: column; justify-content: center; align-items: center;
+            z-index: 250; pointer-events: auto;
+        }
+        .gemini-modal-content {
+            background-color: #1a202c;
+            padding: 2rem;
+            border-radius: 0.75rem;
+            width: 90%;
+            max-width: 600px;
+            border: 1px solid #4a5568;
+        }
+        .gemini-modal-content h2 { font-size: 1.5rem; color: #a0aec0; margin-bottom: 1rem; }
+        .gemini-modal-content textarea {
+            width: 100%;
+            height: 80px;
+            background-color: #2d3748;
+            border: 1px solid #4a5568;
+            border-radius: 0.5rem;
+            padding: 0.75rem;
+            color: #e2e8f0;
+            resize: vertical;
+        }
+        #gemini-response {
+            margin-top: 1rem;
+            padding: 1rem;
+            background-color: #2d3748;
+            border-radius: 0.5rem;
+            min-height: 100px;
+            white-space: pre-wrap;
+            font-size: 0.9rem;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        #gemini-response.loading::after {
+            content: 'Thinking...';
+            color: #a0aec0;
+            animation: pulse 1.5s infinite;
+        }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+
+        /* Pause Menu */
+        #pause-menu {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background-color: rgba(0,0,0,0.75); display: none;
+            flex-direction: column; justify-content: center; align-items: center;
+            z-index: 200; pointer-events: auto;
+        }
+        #pause-menu h2 { font-size: 2.5rem; margin-bottom: 2rem; color: #a0aec0; }
+        .pause-button {
+            background-color: #4a5568; color: white; border: none; padding: 1rem 2rem;
+            margin: 0.5rem; border-radius: 0.5rem; font-size: 1.2rem;
+            cursor: pointer; transition: background-color 0.2s;
+        }
+        .pause-button:hover { background-color: #2d3748; }
+    </style>
+</head>
+<body>
+    <div id="game-container"></div>
+    <div id="ui-overlay">
+        <!-- Inventory will be populated by JS -->
+        <div id="inventory-display"></div>
+        <div id="message-box"></div>
+        <div id="controls-info">
+            <p><strong>Controls:</strong></p>
+            <p>WASD/Arrows: Move</p>
+            <p>Mouse: Look/Turn</p>
+            <p>E: Use Tool</p>
+            <p>Q: Switch Tool</p>
+            <p>F: Open Forge Menu</p>
+            <p>ESC: Pause Game</p>
+        </div>
+        <!-- Forge UI -->
+        <div id="forge-ui">
+            <h3>Forge</h3>
+            <div class="forge-status">Fuel: <span id="forge-fuel-display">0</span> / 100</div>
+            <div class="progress-bar" style="margin-bottom: 1rem;"><div id="forge-fuel-bar" class="progress-bar-inner bg-red-500"></div></div>
+            <div class="forge-status">Status: <span id="smelting-status-display">Idle</span></div>
+            <div class="progress-bar" style="margin-bottom: 1rem;"><div id="smelting-progress-bar" class="progress-bar-inner"></div></div>
+            <div class="smelt-options">
+                <button class="smelt-button" data-ore="copper">Smelt Copper Ingot</button>
+                <button class="smelt-button mt-2" data-ore="iron">Smelt Iron Ingot</button>
+                <button class="smelt-button mt-2" data-ore="gold">Smelt Gold Ingot</button>
+            </div>
+            <button id="add-fuel-button" class="smelt-button mt-4">Add 10 Wood as Fuel</button>
+            <button id="gemini-open-button" class="smelt-button mt-4 bg-purple-600 hover:bg-purple-700">✨ Ask the Forge Master</button>
+        </div>
+    </div>
+    <div id="pause-menu">
+        <h2>Game Paused</h2>
+        <button id="resume-button" class="pause-button">Resume</button>
+        <button id="exit-button" class="pause-button">Exit Game</button>
+    </div>
+
+    <!-- Gemini Modal -->
+    <div id="gemini-modal">
+        <div class="gemini-modal-content">
+            <h2>Ask the Forge Master</h2>
+            <p class="text-sm text-gray-400 mb-2">What do you wish to know, miner?</p>
+            <textarea id="gemini-prompt" placeholder="e.g., What should I make with my gold?"></textarea>
+            <div class="flex justify-end gap-4 mt-4">
+                <button id="gemini-close-button" class="pause-button" style="padding: 0.5rem 1rem; font-size: 1rem;">Close</button>
+                <button id="gemini-submit-button" class="pause-button bg-purple-600 hover:bg-purple-700" style="padding: 0.5rem 1rem; font-size: 1rem;">Ask</button>
+            </div>
+            <div id="gemini-response-container">
+                <p class="text-sm text-gray-400 mt-4 mb-1">The Forge Master says:</p>
+                <div id="gemini-response"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- Core Components ---
+        let scene, camera, renderer, player, pickaxe, axe, forge, forgeLight;
+        let ores = [], trees = [];
+        let playerSpeed = 0.12, playerRotationSpeed = 0.04;
+        const playerHeight = 1.8, playerRadius = 0.4;
+        let inventory = {
+            wood: 10, copper: 1, iron: 1, gold: 1,
+            copperIngot: 0, ironIngot: 0, goldIngot: 0
+        };
+
+        // --- Camera & Controls ---
+        let keysPressed = {};
+        const cameraOffset = new THREE.Vector3(0, 2.5, 5);
+        let cameraPitch = 0.2;
+        const maxPitch = Math.PI / 3, minPitch = -Math.PI / 12;
+        let pointerLocked = false;
+        let equippedTool = 'pickaxe';
+
+        // --- Game State ---
+        let isPaused = false, isInteracting = false, lastTime = performance.now();
+        const MINE_DURATION = 2000, CHOP_DURATION = 2000, SMELT_DURATION = 5000;
+        let actionProgress = 0, currentActionTarget = null;
+        const WORLD_UP = new THREE.Vector3(0, 1, 0);
+
+        // --- Forge State ---
+        let forgeState = {
+            fuel: 0,
+            maxFuel: 100,
+            isSmelting: false,
+            smeltingProgress: 0,
+            oreToSmelt: null
+        };
+        const flickerClock = new THREE.Clock();
+
+        // --- Game Constants ---
+        const ORE_TYPES = {
+            COPPER: { name: 'copper', color: 0xb87333, value: 1, size: 0.8, count: 25 },
+            IRON: { name: 'iron', color: 0x808080, value: 1, size: 1, count: 20 },
+            GOLD: { name: 'gold', color: 0xFFD700, value: 1, size: 0.6, count: 15 }
+        };
+        const TREE_COUNT = 40;
+        const INTERACTION_DISTANCE = 3.5; // Increased slightly for the larger forge
+        const MAP_SIZE = 80;
+
+        // --- Initialization ---
+        function init() {
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x87ceeb);
+            scene.fog = new THREE.Fog(0x87ceeb, MAP_SIZE * 0.5, MAP_SIZE * 1.8);
+            camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.shadowMap.enabled = true;
+            document.getElementById('game-container').appendChild(renderer.domElement);
+            addLights();
+            createGround();
+            createPlayerAndTools();
+            createWorldResources();
+            setupEventListeners();
+            updateInventoryDisplay();
+            updateCameraPosition();
+            animate();
+        }
+
+        // --- World Creation ---
+        function addLights() {
+            scene.add(new THREE.AmbientLight(0xffffff, 0.7));
+            const dirLight = new THREE.DirectionalLight(0xffffff, 0.9);
+            dirLight.position.set(20, 40, 15);
+            dirLight.castShadow = true;
+            dirLight.shadow.mapSize.set(2048, 2048);
+            dirLight.shadow.camera.near = 0.5;
+            dirLight.shadow.camera.far = 150;
+            Object.assign(dirLight.shadow.camera, { left: -MAP_SIZE/2, right: MAP_SIZE/2, top: MAP_SIZE/2, bottom: -MAP_SIZE/2 });
+            scene.add(dirLight);
+        }
+        function createGround() {
+            const groundGeo = new THREE.PlaneGeometry(MAP_SIZE, MAP_SIZE);
+            const groundMat = new THREE.MeshStandardMaterial({ color: 0x556B2F, roughness: 0.8 });
+            const ground = new THREE.Mesh(groundGeo, groundMat);
+            ground.rotation.x = -Math.PI / 2;
+            ground.receiveShadow = true;
+            scene.add(ground);
+        }
+        function createPlayerAndTools() {
+             const playerGroup = new THREE.Group();
+            const bodyGeo = new THREE.CylinderGeometry(playerRadius, playerRadius, playerHeight - playerRadius * 2, 16);
+            const playerMat = new THREE.MeshStandardMaterial({ color: 0x3b82f6, roughness: 0.6 });
+            const body = new THREE.Mesh(bodyGeo, playerMat);
+            body.position.y = playerHeight / 2 - playerRadius; body.castShadow = true;
+            playerGroup.add(body);
+            const headGeo = new THREE.SphereGeometry(playerRadius, 16, 8);
+            const head = new THREE.Mesh(headGeo, playerMat);
+            head.position.y = playerHeight - playerRadius;
+            playerGroup.add(head);
+            player = playerGroup;
+            player.position.y = playerRadius;
+            scene.add(player);
+            pickaxe = createTool(0x718096, 0.8);
+            player.add(pickaxe);
+            axe = createTool(0xdb2777, 1.0, true);
+            player.add(axe);
+            toggleTool(equippedTool, true);
+        }
+        function createTool(color, handleLength, isAxe = false) {
+            const tool = new THREE.Group();
+            const handleGeom = new THREE.CylinderGeometry(0.05, 0.05, handleLength, 8);
+            const handleMat = new THREE.MeshStandardMaterial({ color: 0x8B4513 });
+            const handle = new THREE.Mesh(handleGeom, handleMat);
+            handle.position.y = handleLength / 2;
+            tool.add(handle);
+            const headMat = new THREE.MeshStandardMaterial({ color: color });
+            let headGeom;
+            if (isAxe) {
+                headGeom = new THREE.BoxGeometry(0.1, 0.4, 0.3);
+            } else {
+                headGeom = new THREE.BoxGeometry(0.1, 0.3, 0.1);
+            }
+            const head = new THREE.Mesh(headGeom, headMat);
+            head.position.set(0, handleLength, isAxe ? 0.0 : 0.05);
+            head.rotation.z = isAxe ? 0 : Math.PI / 2.5;
+            tool.add(head);
+            tool.position.set(playerRadius, playerHeight * 0.6, playerRadius * 0.5);
+            tool.rotation.x = Math.PI / 2; tool.rotation.y = -0.5;
+            return tool;
+        }
+
+        function createWorldResources() {
+            // Ores
+            Object.values(ORE_TYPES).forEach(type => {
+                for (let i = 0; i < type.count; i++) {
+                    const oreGeo = new THREE.DodecahedronGeometry(type.size * 0.6, 0);
+                    const ore = new THREE.Mesh(oreGeo, new THREE.MeshStandardMaterial({ color: type.color, metalness: 0.4, roughness: 0.7 }));
+                    ore.position.set((Math.random() - 0.5) * MAP_SIZE, type.size * 0.5, (Math.random() * 0.5) * MAP_SIZE - MAP_SIZE * 0.45);
+                    ore.castShadow = true; ore.receiveShadow = true;
+                    ore.userData = { type: type.name, resourceType: 'ore', respawnTimer: null };
+                    scene.add(ore); ores.push(ore);
+                }
+            });
+            // Trees
+            const forestX = -MAP_SIZE / 2 + 10; const forestZ = MAP_SIZE / 2 - 10;
+            for (let i = 0; i < TREE_COUNT; i++) {
+                const trunkHeight = 3 + Math.random() * 2;
+                const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.3, trunkHeight, 8), new THREE.MeshStandardMaterial({ color: 0x8B4513 }));
+                const leaves = new THREE.Mesh(new THREE.DodecahedronGeometry(1.2, 0), new THREE.MeshStandardMaterial({ color: 0x22c55e }));
+                const tree = new THREE.Group();
+                trunk.castShadow = true; trunk.position.y = trunkHeight / 2;
+                leaves.castShadow = true; leaves.position.y = trunkHeight + 0.5;
+                tree.add(trunk); tree.add(leaves);
+                tree.position.set(Math.random() * 20 - 10 + forestX, 0, Math.random() * 20 - 10 + forestZ);
+                tree.userData = { type: 'tree', resourceType: 'wood', respawnTimer: null };
+                scene.add(tree); trees.push(tree);
+            }
+            // Forge
+            createDetailedForge();
+        }
+
+        function createDetailedForge() {
+            forge = new THREE.Group();
+
+            const stoneMaterial = new THREE.MeshStandardMaterial({ color: 0x888888, roughness: 0.8, metalness: 0.1 });
+            const metalMaterial = new THREE.MeshStandardMaterial({ color: 0x333333, metalness: 0.9, roughness: 0.4 });
+            const fireMaterial = new THREE.MeshBasicMaterial({ color: 0xffaa33 });
+            
+            // Forge Base
+            const forgeBase = new THREE.Mesh(new THREE.BoxGeometry(4, 1, 4), stoneMaterial);
+            forgeBase.position.y = 0.5;
+            forgeBase.castShadow = true;
+            forge.add(forgeBase);
+
+            // Forge Fire
+            const forgeFire = new THREE.Mesh(new THREE.BoxGeometry(2, 1, 2), fireMaterial);
+            forgeFire.position.y = 1.5;
+            forge.add(forgeFire);
+
+            // Add flickering light to fire
+            forgeLight = new THREE.PointLight(0xffaa33, 2, 100);
+            forgeLight.position.set(0, 0, 0); // Position relative to fire center
+            forgeLight.castShadow = true;
+            forgeFire.add(forgeLight);
+
+            // Chimney
+            const chimney = new THREE.Mesh(new THREE.CylinderGeometry(1, 1.5, 6, 8), stoneMaterial);
+            chimney.position.set(0, 4, 0); // y = 1 (base) + 6/2 = 4
+            chimney.castShadow = true;
+            forge.add(chimney);
+
+            // Anvil
+            const anvilTop = new THREE.Mesh(new THREE.BoxGeometry(2, 0.5, 0.75), metalMaterial);
+            anvilTop.position.set(4, 1.25, 0);
+            anvilTop.castShadow = true;
+            forge.add(anvilTop);
+            
+            const anvilHorn = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.1, 1, 16), metalMaterial);
+            anvilHorn.rotation.z = -Math.PI / 2;
+            anvilHorn.position.set(5.5, 1.25, 0);
+            anvilHorn.castShadow = true;
+            forge.add(anvilHorn);
+
+            const anvilBase = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 0.5), metalMaterial);
+            anvilBase.position.set(4, 0.5, 0);
+            anvilBase.castShadow = true;
+            forge.add(anvilBase);
+
+            // Position the entire forge group
+            forge.position.set(0, 0, -10);
+            scene.add(forge);
+        }
+
+        // --- Event Listeners & Controls ---
+        function togglePause() {
+            isPaused = !isPaused;
+            document.getElementById('pause-menu').style.display = isPaused ? 'flex' : 'none';
+            if (isPaused) {
+                if (document.pointerLockElement) document.exitPointerLock();
+                keysPressed = {};
+            } else {
+                document.body.requestPointerLock();
+                lastTime = performance.now();
+            }
+        }
+        function setupEventListeners() {
+            document.addEventListener('keydown', onKeyDown);
+            document.addEventListener('keyup', onKeyUp);
+            document.addEventListener('mousemove', onMouseMove);
+            window.addEventListener('resize', onWindowResize);
+            document.getElementById('game-container').addEventListener('click', () => { if (!isPaused) document.body.requestPointerLock(); });
+            document.addEventListener('pointerlockchange', () => { pointerLocked = !!document.pointerLockElement; });
+            document.getElementById('resume-button').addEventListener('click', togglePause);
+            document.getElementById('exit-button').addEventListener('click', () => window.location.reload());
+            document.getElementById('add-fuel-button').addEventListener('click', addForgeFuel);
+            document.querySelectorAll('.smelt-button[data-ore]').forEach(btn => {
+                btn.addEventListener('click', () => startSmelting(btn.dataset.ore));
+            });
+            document.getElementById('gemini-open-button').addEventListener('click', openGeminiModal);
+            document.getElementById('gemini-close-button').addEventListener('click', closeGeminiModal);
+            document.getElementById('gemini-submit-button').addEventListener('click', askGemini);
+        }
+        function onKeyDown(event) {
+            const key = event.key.toLowerCase();
+            if (key === 'escape') { togglePause(); return; }
+            if (isPaused || isInteracting || document.getElementById('gemini-modal').style.display === 'flex') return;
+            keysPressed[key] = true;
+            if (key === 'e') startAction();
+            if (key === 'q') toggleTool();
+            if (key === 'f') toggleForgeUI();
+        }
+        function onKeyUp(event) {
+            keysPressed[event.key.toLowerCase()] = false;
+        }
+        function onMouseMove(event) {
+            if (isPaused || !pointerLocked) return;
+            const movementX = event.movementX || 0;
+            const movementY = event.movementY || 0;
+            player.rotation.y -= movementX * playerRotationSpeed;
+            cameraPitch -= movementY * playerRotationSpeed;
+            cameraPitch = Math.max(minPitch, Math.min(maxPitch, cameraPitch));
+        }
+        function toggleTool(tool, force = false) {
+            if (!force && isInteracting) return;
+            equippedTool = tool || (equippedTool === 'pickaxe' ? 'axe' : 'pickaxe');
+            pickaxe.visible = (equippedTool === 'pickaxe');
+            axe.visible = (equippedTool === 'axe');
+            updateInventoryDisplay();
+            showGameMessage(`Equipped ${equippedTool}`, 1000);
+        }
+
+        // --- Player & Camera Update ---
+        function updatePlayer(deltaTime) {
+            if (isInteracting) return;
+            const moveSpeed = playerSpeed * (deltaTime / (1000/60));
+            const forward = new THREE.Vector3(); player.getWorldDirection(forward);
+            const right = new THREE.Vector3().crossVectors(WORLD_UP, forward).normalize();
+            if (keysPressed['w'] || keysPressed['arrowup']) { player.position.addScaledVector(forward, -moveSpeed); }
+            if (keysPressed['s'] || keysPressed['arrowdown']) { player.position.addScaledVector(forward, moveSpeed); }
+            if (keysPressed['a'] || keysPressed['arrowleft']) { player.position.addScaledVector(right, moveSpeed); }
+            if (keysPressed['d'] || keysPressed['arrowright']) { player.position.addScaledVector(right, -moveSpeed); }
+            player.position.x = Math.max(-MAP_SIZE / 2 + playerRadius, Math.min(MAP_SIZE / 2 - playerRadius, player.position.x));
+            player.position.z = Math.max(-MAP_SIZE / 2 + playerRadius, Math.min(MAP_SIZE / 2 - playerRadius, player.position.z));
+        }
+        function updateCameraPosition() {
+            const lookAtPoint = player.position.clone().add(new THREE.Vector3(0, 1.5, 0));
+            const relativeOffset = cameraOffset.clone();
+            relativeOffset.applyQuaternion(player.quaternion);
+            camera.position.copy(player.position).add(relativeOffset);
+            const pitchAdjust = new THREE.Vector3(0, Math.tan(cameraPitch) * cameraOffset.z, 0);
+            const finalLookAt = lookAtPoint.add(pitchAdjust);
+            camera.lookAt(finalLookAt);
+        }
+
+        // --- Game Actions (Mining, Chopping) ---
+        function startAction() {
+            if (isInteracting) return;
+            let target, duration;
+            const resourceList = equippedTool === 'pickaxe' ? ores : trees;
+            
+            let closestDistSq = INTERACTION_DISTANCE * INTERACTION_DISTANCE;
+            resourceList.forEach(res => {
+                if (res.visible) {
+                    const distSq = player.position.distanceToSquared(res.position);
+                    if (distSq < closestDistSq) { closestDistSq = distSq; target = res; }
+                }
+            });
+
+            if (target) {
+                isInteracting = true;
+                currentActionTarget = target;
+                actionProgress = 0;
+                duration = equippedTool === 'pickaxe' ? MINE_DURATION : CHOP_DURATION;
+                
+                const directionToTarget = new THREE.Vector3().subVectors(target.position, player.position);
+                player.rotation.y = Math.atan2(directionToTarget.x, directionToTarget.z);
+                const resourceName = target.userData.resourceType === 'ore' ? target.userData.type : target.userData.resourceType;
+                showGameMessage(`Gathering ${resourceName}...`, duration + 100);
+            } else {
+                showGameMessage(`No ${equippedTool === 'pickaxe' ? 'ore' : 'trees'} in range.`, 1500);
+            }
+        }
+        function updateAction(deltaTime) {
+            if (!isInteracting || !currentActionTarget) return;
+            
+            const tool = equippedTool === 'pickaxe' ? pickaxe : axe;
+            const duration = equippedTool === 'pickaxe' ? MINE_DURATION : CHOP_DURATION;
+            actionProgress += deltaTime / duration;
+
+            const swingProgress = (actionProgress * duration / 200) % 1;
+            tool.rotation.x = Math.PI / 2 - (Math.PI / 3) * Math.sin(swingProgress * Math.PI);
+
+            if (actionProgress >= 1) {
+                const resourceKey = currentActionTarget.userData.resourceType === 'ore' 
+                    ? currentActionTarget.userData.type 
+                    : currentActionTarget.userData.resourceType;
+
+                inventory[resourceKey]++;
+                showGameMessage(`+1 ${resourceKey}!`, 2000);
+                updateInventoryDisplay();
+                
+                currentActionTarget.visible = false;
+                const targetToRespawn = currentActionTarget;
+                if (targetToRespawn.userData.respawnTimer === null) {
+                    targetToRespawn.userData.respawnTimer = setTimeout(() => {
+                        targetToRespawn.visible = true;
+                        targetToRespawn.userData.respawnTimer = null;
+                    }, 20000 + Math.random() * 10000);
+                }
+                
+                isInteracting = false;
+                currentActionTarget = null;
+                actionProgress = 0;
+                tool.rotation.x = Math.PI / 2;
+            }
+        }
+
+        // --- Forge Logic & Gemini API ---
+        function toggleForgeUI() {
+            const forgeUI = document.getElementById('forge-ui');
+            const distSq = player.position.distanceToSquared(forge.position);
+            if (forgeUI.style.display === 'none' && distSq < (INTERACTION_DISTANCE * INTERACTION_DISTANCE)) {
+                forgeUI.style.display = 'block';
+                if (document.pointerLockElement) document.exitPointerLock();
+            } else {
+                forgeUI.style.display = 'none';
+            }
+        }
+        function addForgeFuel() {
+            if (inventory.wood >= 10 && forgeState.fuel + 10 <= forgeState.maxFuel) {
+                inventory.wood -= 10;
+                forgeState.fuel += 10;
+                updateForgeUI();
+                updateInventoryDisplay();
+                showGameMessage("+10 Fuel", 1500);
+            } else if (inventory.wood < 10) {
+                showGameMessage("Not enough wood (need 10).", 1500);
+            } else {
+                showGameMessage("Forge fuel is full.", 1500);
+            }
+        }
+        function startSmelting(oreType) {
+            if (forgeState.isSmelting) { showGameMessage("Forge is busy.", 1500); return; }
+            if (forgeState.fuel < 5) { showGameMessage("Not enough fuel (need 5).", 1500); return; }
+            if (inventory[oreType] < 1) { showGameMessage(`No ${oreType} ore to smelt.`, 1500); return; }
+
+            forgeState.fuel -= 5;
+            inventory[oreType]--;
+            forgeState.isSmelting = true;
+            forgeState.smeltingProgress = 0;
+            forgeState.oreToSmelt = oreType;
+            
+            showGameMessage(`Smelting ${oreType} ingot...`, SMELT_DURATION);
+            updateForgeUI();
+            updateInventoryDisplay();
+        }
+        function updateSmelting(deltaTime) {
+            if (!forgeState.isSmelting) return;
+
+            forgeState.smeltingProgress += deltaTime / SMELT_DURATION;
+            if (forgeState.smeltingProgress >= 1) {
+                const ingotType = `${forgeState.oreToSmelt}Ingot`;
+                inventory[ingotType]++;
+                showGameMessage(`+1 ${forgeState.oreToSmelt} Ingot!`, 2000);
+                updateInventoryDisplay();
+                
+                forgeState.isSmelting = false;
+                forgeState.smeltingProgress = 0;
+                forgeState.oreToSmelt = null;
+            }
+            if (document.getElementById('forge-ui').style.display === 'block') {
+                updateForgeUI();
+            }
+        }
+        
+        function openGeminiModal() {
+            document.getElementById('gemini-modal').style.display = 'flex';
+            document.getElementById('gemini-response').textContent = '...';
+            if (document.pointerLockElement) document.exitPointerLock();
+        }
+        function closeGeminiModal() {
+            document.getElementById('gemini-modal').style.display = 'none';
+        }
+        async function askGemini() {
+            const userInput = document.getElementById('gemini-prompt').value;
+            if (!userInput) {
+                showGameMessage("You must ask a question!", 2000);
+                return;
+            }
+
+            const responseDiv = document.getElementById('gemini-response');
+            responseDiv.textContent = '';
+            responseDiv.classList.add('loading');
+            
+            const inventoryString = Object.entries(inventory)
+                .map(([key, value]) => `${key}: ${value}`)
+                .join(', ');
+
+            const fullPrompt = `
+                You are the Forge Master, a wise, ancient, and slightly grumpy blacksmith in a fantasy world. 
+                A player comes to you for advice.
+                Their inventory contains: ${inventoryString}.
+                Their question is: "${userInput}"
+                
+                Give them a short, creative, in-character response. Offer helpful advice, but with the personality of a master craftsman who has seen it all. 
+                Keep your response to about 2-4 sentences.
+            `;
+
+            try {
+                const chatHistory = [{ role: "user", parts: [{ text: fullPrompt }] }];
+                const payload = { contents: chatHistory };
+                const apiKey = "";
+                const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const result = await response.json();
+                
+                responseDiv.classList.remove('loading');
+
+                if (result.candidates && result.candidates.length > 0) {
+                    responseDiv.textContent = result.candidates[0].content.parts[0].text;
+                } else {
+                    responseDiv.textContent = "The Forge Master grunts, seemingly unimpressed by your question. Try asking again.";
+                }
+            } catch (error) {
+                console.error("Gemini API error:", error);
+                responseDiv.classList.remove('loading');
+                responseDiv.textContent = "The forge fire sputters and dies... something is wrong. (API Error)";
+            }
+        }
+
+
+        // --- UI Updates ---
+        let messageTimeout;
+        function showGameMessage(message, duration = 3000) {
+            const box = document.getElementById('message-box');
+            box.textContent = message; box.style.opacity = '1';
+            clearTimeout(messageTimeout);
+            messageTimeout = setTimeout(() => { box.style.opacity = '0'; }, duration);
+        }
+        function updateInventoryDisplay() {
+            const container = document.getElementById('inventory-display');
+            container.innerHTML = `
+                <div class="inventory-category">Tools</div>
+                <div class="inventory-slot bg-slate-700">
+                    <div class="icon-placeholder">T</div> <span>${equippedTool.charAt(0).toUpperCase() + equippedTool.slice(1)}</span>
+                </div>
+                <div class="inventory-category">Resources</div>
+                <div class="inventory-slot"><div class="icon-placeholder" style="background-color:#A0522D;">W</div> <span>Wood: ${inventory.wood}</span></div>
+                <div class="inventory-slot"><div class="icon-placeholder" style="background-color:#b87333;">Cu</div> <span>Copper: ${inventory.copper}</span></div>
+                <div class="inventory-slot"><div class="icon-placeholder" style="background-color:#808080;">Fe</div> <span>Iron: ${inventory.iron}</span></div>
+                <div class="inventory-slot"><div class="icon-placeholder" style="background-color:#FFD700;">Au</div> <span>Gold: ${inventory.gold}</span></div>
+                <div class="inventory-category">Ingots</div>
+                <div class="inventory-slot"><div class="icon-placeholder" style="background-color:#f97316;"></div> <span>Copper: ${inventory.copperIngot}</span></div>
+                <div class="inventory-slot"><div class="icon-placeholder" style="background-color:#9ca3af;"></div> <span>Iron: ${inventory.ironIngot}</span></div>
+                <div class="inventory-slot"><div class="icon-placeholder" style="background-color:#facc15;"></div> <span>Gold: ${inventory.goldIngot}</span></div>
+            `;
+        }
+        function updateForgeUI() {
+            document.getElementById('forge-fuel-display').textContent = `${forgeState.fuel}`;
+            document.getElementById('forge-fuel-bar').style.width = `${(forgeState.fuel / forgeState.maxFuel) * 100}%`;
+            
+            const statusDisplay = document.getElementById('smelting-status-display');
+            const progressBar = document.getElementById('smelting-progress-bar');
+            if (forgeState.isSmelting) {
+                statusDisplay.textContent = `Smelting ${forgeState.oreToSmelt}...`;
+                progressBar.style.width = `${forgeState.smeltingProgress * 100}%`;
+            } else {
+                statusDisplay.textContent = 'Idle';
+                progressBar.style.width = '0%';
+            }
+            document.querySelectorAll('.smelt-button[data-ore]').forEach(btn => {
+                const ore = btn.dataset.ore;
+                btn.classList.toggle('disabled', forgeState.isSmelting || forgeState.fuel < 5 || inventory[ore] < 1);
+            });
+            document.getElementById('add-fuel-button').classList.toggle('disabled', inventory.wood < 10 || forgeState.fuel >= forgeState.maxFuel);
+        }
+        
+
+        // --- Main Loop & Resize ---
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+        function animate() {
+            requestAnimationFrame(animate);
+            const currentTime = performance.now();
+            const deltaTime = currentTime - lastTime;
+            lastTime = currentTime;
+
+            if (isPaused) { 
+                renderer.render(scene, camera); 
+                return; 
+            }
+            
+            // Flicker the forge light
+            if(forgeLight) {
+                const flickerSpeed = 5;
+                const flickerStrength = 0.25;
+                forgeLight.intensity = 2 + Math.sin(flickerClock.elapsedTime * flickerSpeed) * flickerStrength;
+            }
+
+            updatePlayer(deltaTime);
+            updateAction(deltaTime);
+            updateSmelting(deltaTime);
+            updateCameraPosition();
+
+            renderer.render(scene, camera);
+        }
+
+        // --- INIT ---
+        init();
+    </script>
+</body>
+</html>
