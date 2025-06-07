@@ -408,11 +408,11 @@ class Game {
         }
         
         if (this.gameState.isKeyPressed('a') || this.gameState.isKeyPressed('arrowleft')) { 
-            this.player.position.addScaledVector(right, moveSpeed); 
+            this.player.position.addScaledVector(right, -moveSpeed);
         }
         
         if (this.gameState.isKeyPressed('d') || this.gameState.isKeyPressed('arrowright')) { 
-            this.player.position.addScaledVector(right, -moveSpeed); 
+            this.player.position.addScaledVector(right, moveSpeed);
         }
         
         // Constrain player to map boundaries
