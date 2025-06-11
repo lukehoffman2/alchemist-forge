@@ -1,0 +1,415 @@
+body { margin: 0; overflow: hidden; font-family: 'Inter', sans-serif; background-color: #1a202c; color: #e2e8f0; }
+#game-container { width: 100vw; height: 100vh; display: block; cursor: grab; }
+canvas { display: block; }
+
+/* UI Overlay */
+#ui-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+}
+
+/* Inventory */
+#inventory-display {
+    position: absolute;
+    top: 1rem;
+    left: 1rem;
+    padding: 0.75rem;
+    background-color: rgba(0,0,0,0.6);
+    border-radius: 0.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    pointer-events: auto;
+    width: 220px;
+}
+.inventory-slot {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.5rem;
+    border-radius: 0.25rem;
+    font-size: 0.9rem;
+}
+.inventory-slot .icon-placeholder {
+    width: 28px; height: 28px; flex-shrink: 0;
+    background-color: #4a5568; border-radius: 4px;
+    display: flex; align-items: center; justify-content: center; font-weight: bold;
+}
+.inventory-category {
+    font-size: 0.75rem; text-transform: uppercase; color: #a0aec0; margin-top: 0.5rem; padding-left: 0.25rem;
+}
+
+
+/* Message & Info Boxes */
+#message-box {
+    position: absolute; bottom: 70px; left: 50%; transform: translateX(-50%);
+    background-color: rgba(45, 55, 72, 0.9); color: white;
+    padding: 0.75rem 1.25rem; border-radius: 0.5rem; font-size: 0.9rem;
+    text-align: center; opacity: 0; transition: opacity 0.5s ease-in-out; z-index: 100;
+}
+#controls-info {
+    position: absolute; bottom: 1rem; right: 1rem;
+    background-color: rgba(0,0,0,0.6); padding: 0.75rem;
+    border-radius: 0.5rem; font-size: 0.85rem;
+}
+
+/* Forge UI */
+#forge-ui {
+    position: absolute; top: 1rem; right: 1rem;
+    background-color: rgba(0,0,0,0.7);
+    padding: 1rem; border-radius: 0.5rem;
+    width: 320px; pointer-events: auto;
+    display: none; /* Hidden by default */
+    max-height: 80vh;
+    overflow-y: auto;
+}
+#forge-ui h3 { font-size: 1.2rem; margin-bottom: 0.75rem; text-align: center; }
+#forge-ui h4 { font-size: 1rem; margin-bottom: 0.5rem; color: #a0aec0; }
+.forge-status, .smelt-option { margin-bottom: 0.5rem; }
+.smelt-button, .craft-button {
+    width: 100%; text-align: left; padding: 0.5rem;
+    background-color: #4a5568; border-radius: 0.25rem;
+    cursor: pointer; transition: background-color 0.2s;
+}
+.smelt-button:hover, .craft-button:hover { background-color: #718096; }
+.smelt-button.disabled, .craft-button.disabled { background-color: #2d3748; color: #718096; cursor: not-allowed; }
+.progress-bar { width: 100%; background-color: #2d3748; border-radius: 4px; overflow: hidden; height: 10px; }
+.progress-bar-inner { width: 0%; height: 100%; background-color: #f59e0b; transition: width 0.2s; }
+#add-fuel-button { width: 100%; margin-top: 0.75rem; background-color: #8B4513; }
+
+/* Forge Tabs */
+.forge-tabs {
+    display: flex;
+    margin-bottom: 1rem;
+    border-bottom: 1px solid #4a5568;
+}
+.forge-tab-button {
+    flex: 1;
+    background-color: transparent;
+    border: none;
+    color: #a0aec0;
+    padding: 0.5rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    border-bottom: 2px solid transparent;
+}
+.forge-tab-button:hover {
+    color: #e2e8f0;
+}
+.forge-tab-button.active {
+    color: #e2e8f0;
+    border-bottom-color: #f59e0b;
+}
+.forge-tab-content {
+    margin-bottom: 1rem;
+}
+
+/* Craft Category Tabs */
+.craft-category-tabs {
+    display: flex;
+    margin-bottom: 0.75rem;
+}
+.craft-category-button {
+    flex: 1;
+    background-color: #2d3748;
+    border: none;
+    color: #a0aec0;
+    padding: 0.4rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-size: 0.8rem;
+}
+.craft-category-button:first-child {
+    border-top-left-radius: 0.25rem;
+    border-bottom-left-radius: 0.25rem;
+}
+.craft-category-button:last-child {
+    border-top-right-radius: 0.25rem;
+    border-bottom-right-radius: 0.25rem;
+}
+.craft-category-button:hover {
+    background-color: #4a5568;
+}
+.craft-category-button.active {
+    background-color: #4a5568;
+    color: #e2e8f0;
+}
+
+/* Craft Options */
+.craft-options {
+    max-height: 300px;
+    overflow-y: auto;
+}
+.craft-item {
+    background-color: #2d3748;
+    border-radius: 0.25rem;
+    padding: 0.75rem;
+    margin-bottom: 0.5rem;
+}
+.craft-item-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+}
+.craft-item-name {
+    font-weight: bold;
+    color: #e2e8f0;
+}
+.craft-item-stats {
+    font-size: 0.8rem;
+    color: #a0aec0;
+}
+.craft-item-materials {
+    font-size: 0.8rem;
+    color: #a0aec0;
+    margin-bottom: 0.5rem;
+}
+.craft-button {
+    font-size: 0.9rem;
+    text-align: center;
+    background-color: #4a5568;
+}
+.craft-button.disabled {
+    background-color: #2d3748;
+    color: #718096;
+    cursor: not-allowed;
+}
+
+/* Gemini Modal */
+#gemini-modal {
+    position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+    background-color: rgba(0,0,0,0.85); display: none;
+    flex-direction: column; justify-content: center; align-items: center;
+    z-index: 250; pointer-events: auto;
+}
+.gemini-modal-content {
+    background-color: #1a202c;
+    padding: 2rem;
+    border-radius: 0.75rem;
+    width: 90%;
+    max-width: 600px;
+    border: 1px solid #4a5568;
+}
+.gemini-modal-content h2 { font-size: 1.5rem; color: #a0aec0; margin-bottom: 1rem; }
+.gemini-modal-content textarea {
+    width: 100%;
+    height: 80px;
+    background-color: #2d3748;
+    border: 1px solid #4a5568;
+    border-radius: 0.5rem;
+    padding: 0.75rem;
+    color: #e2e8f0;
+    resize: vertical;
+}
+#gemini-response {
+    margin-top: 1rem;
+    padding: 1rem;
+    background-color: #2d3748;
+    border-radius: 0.5rem;
+    min-height: 100px;
+    white-space: pre-wrap;
+    font-size: 0.9rem;
+    max-height: 200px;
+    overflow-y: auto;
+}
+#gemini-response.loading::after {
+    content: 'Thinking...';
+    color: #a0aec0;
+    animation: pulse 1.5s infinite;
+}
+@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+
+/* Health Bar */
+.health-bar-container {
+    position: absolute;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 300px;
+    height: 20px;
+    background-color: rgba(0,0,0,0.6);
+    border-radius: 10px;
+    overflow: hidden;
+    border: 2px solid #4a5568;
+}
+.health-bar {
+    height: 100%;
+    width: 100%;
+    background-color: #22c55e;
+    transition: width 0.3s, background-color 0.3s;
+}
+.health-text {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-weight: bold;
+    font-size: 0.8rem;
+    text-shadow: 1px 1px 2px rgba(0,0,0,0.8);
+}
+
+/* Equipment Modal */
+.equipment-modal {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0,0,0,0.75);
+    display: none;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    z-index: 300;
+    pointer-events: auto;
+}
+.equipment-modal-content {
+    background-color: #1a202c;
+    padding: 1.5rem;
+    border-radius: 0.75rem;
+    width: 90%;
+    max-width: 400px;
+    border: 1px solid #4a5568;
+}
+.equipment-modal-content h3 {
+    font-size: 1.2rem;
+    color: #a0aec0;
+    margin-bottom: 1rem;
+    text-align: center;
+}
+.equipment-modal-content p {
+    margin-bottom: 0.5rem;
+}
+.equipment-actions {
+    margin-top: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+.equip-slot-button {
+    background-color: #4a5568;
+    color: white;
+    border: none;
+    padding: 0.5rem 1rem;
+    border-radius: 0.25rem;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+.equip-slot-button:hover {
+    background-color: #2d3748;
+}
+.close-button {
+    background-color: #4a5568;
+    color: white;
+    border: none;
+    padding: 0.5rem 1rem;
+    border-radius: 0.25rem;
+    cursor: pointer;
+    transition: background-color 0.2s;
+    margin-top: 1rem;
+    width: 100%;
+}
+.close-button:hover {
+    background-color: #2d3748;
+}
+
+/* Equipment UI */
+#equipment-ui {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background-color: rgba(0,0,0,0.8);
+    padding: 1.5rem;
+    border-radius: 0.75rem;
+    width: 90%;
+    max-width: 800px;
+    display: none;
+    pointer-events: auto;
+}
+#equipment-ui h3 {
+    font-size: 1.5rem;
+    color: #a0aec0;
+    margin-bottom: 1rem;
+    text-align: center;
+}
+.equipment-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 1rem;
+}
+.character-model {
+    grid-column: 2;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background-color: rgba(74, 85, 104, 0.3);
+    border-radius: 0.5rem;
+    padding: 1rem;
+    height: 400px;
+    position: relative;
+}
+.equipment-slot {
+    position: absolute;
+    width: 60px;
+    height: 60px;
+    background-color: rgba(45, 55, 72, 0.8);
+    border: 2px solid #4a5568;
+    border-radius: 0.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #a0aec0;
+    font-size: 0.8rem;
+    cursor: pointer;
+}
+.equipment-slot:hover {
+    border-color: #a0aec0;
+}
+.equipment-slot.head { top: 20px; left: 50%; transform: translateX(-50%); }
+.equipment-slot.chest { top: 100px; left: 50%; transform: translateX(-50%); }
+.equipment-slot.hands { top: 100px; left: 20px; }
+.equipment-slot.legs { top: 180px; left: 50%; transform: translateX(-50%); }
+.equipment-slot.feet { top: 260px; left: 50%; transform: translateX(-50%); }
+.equipment-slot.mainHand { top: 180px; left: 20px; }
+.equipment-slot.offHand { top: 180px; right: 20px; }
+.player-stats-panel {
+    grid-column: 1;
+    background-color: rgba(45, 55, 72, 0.5);
+    border-radius: 0.5rem;
+    padding: 1rem;
+}
+.inventory-panel {
+    grid-column: 3;
+    background-color: rgba(45, 55, 72, 0.5);
+    border-radius: 0.5rem;
+    padding: 1rem;
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+/* Pause Menu */
+#pause-menu {
+    position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+    background-color: rgba(0,0,0,0.75); display: none;
+    flex-direction: column; justify-content: center; align-items: center;
+    z-index: 200; pointer-events: auto;
+}
+#pause-menu h2 { font-size: 2.5rem; margin-bottom: 2rem; color: #a0aec0; }
+.pause-button {
+    background-color: #4a5568; color: white; border: none; padding: 1rem 2rem;
+    margin: 0.5rem; border-radius: 0.5rem; font-size: 1.2rem;
+    cursor: pointer; transition: background-color 0.2s;
+}
+.pause-button:hover { background-color: #2d3748; }
