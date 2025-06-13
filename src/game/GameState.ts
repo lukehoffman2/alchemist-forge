@@ -75,6 +75,7 @@ class GameState {
     // Game state
     public isPaused: boolean = false;
     public isInteracting: boolean = false;
+    public isToolPopupVisible: boolean = false; // <-- ADD THIS LINE
     public actionProgress: number = 0;
     public currentActionTarget: ActionTarget | null = null;
 

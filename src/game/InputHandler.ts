@@ -122,7 +122,7 @@ class InputHandler {
         }
 
         // Add a check for the tool popup
-        if (this.gameState.isPaused || this.gameState.isInteracting || this.hud?.isPopupVisible()) {
+        if (this.gameState.isPaused || this.gameState.isInteracting || this.gameState.isToolPopupVisible) {
             return;
         }
 

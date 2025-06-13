@@ -109,8 +109,8 @@ class Game {
 
         // Initialize the HUD with our tool data
         const tools: ToolInfo[] = [
-            { id: 'pickaxe', name: 'Pickaxe', iconUrl: 'assets/icons/pickaxe.png' },
-            { id: 'axe', name: 'Axe', iconUrl: 'assets/icons/axe.png' }
+            { id: 'pickaxe', name: 'Pickaxe', iconUrl: 'src/assets/icons/pickaxe.png' },
+            { id: 'axe', name: 'Axe', iconUrl: 'src/assets/icons/axe.png' }
         ];
         this.hud.setTools(tools);
 
@@ -207,8 +207,10 @@ class Game {
             onToggleToolPopup: () => {
                 if (this.hud?.isPopupVisible()) {
                     this.hud.hideToolPopup();
+                    this.gameState.isToolPopupVisible = false
                 } else {
                     this.hud?.showToolPopup();
+                    this.gameState.isToolPopupVisible = true
                 }
             }
         });
@@ -444,7 +446,7 @@ class Game {
 
         const loader = new GLTFLoader();
         loader.load(
-            'assets/forge.glb',
+            'src/assets/forge.glb',
             (gltf) => {
                 const modelScene = gltf.scene;
                 const desiredScale = 10;
