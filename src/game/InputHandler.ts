@@ -8,6 +8,7 @@ interface InputHandlerCallbacks {
     onAction?: () => void;
     onToggleTool?: () => void;
     onToggleForgeUI?: () => void;
+    onToggleEquipmentUI?: () => void; // Added for equipment UI
     onWindowResize?: () => void;
     // We can add a new callback for the tool popup
     onToggleToolPopup?: () => void;
@@ -179,12 +180,15 @@ class InputHandler {
             if (this.qKeyTimer) {
                 clearTimeout(this.qKeyTimer);
                 this.qKeyTimer = null;
-                if (!this.qKeyLongPressDetected) {
+                if (!this.qKeyLongPressDetected) { // Short press for tool toggle
                     this.callbacks.onToggleTool?.();
                 }
             }
-            // Reset long press detection for the next key press cycle
-            this.qKeyLongPressDetected = false;
+            this.qKeyLongPressDetected = false; // Reset for next press
+        }
+
+        if (key === 'e') { // 'E' key to toggle equipment UI
+            this.callbacks.onToggleEquipmentUI?.();
         }
     }
 
