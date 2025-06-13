@@ -212,6 +212,16 @@ class Game {
                     this.hud?.showToolPopup();
                     this.gameState.isToolPopupVisible = true
                 }
+            },
+            onToggleInventory: () => {
+                if (this.hud) { // Ensure hud is available
+                    const newVisibility = this.gameState.toggleInventoryVisibility();
+                    this.hud.toggleInventoryDisplay(newVisibility);
+                    // If inventory is now visible, update its content
+                    if (newVisibility) {
+                        this.hud.setInventory(this.gameState.getStructuredInventory());
+                    }
+                }
             }
         });
 
@@ -905,6 +915,10 @@ class Game {
         this.updatePlayer(deltaTime);
         this.updateAction(deltaTime);
         this.updateSmelting(deltaTime);
+
+        if (this.gameState.isInventoryVisible && this.hud) {
+            this.hud.setInventory(this.gameState.getStructuredInventory());
+        }
 
         if (this.player && this.renderSystem) {
             this.renderSystem.updateCameraPosition(

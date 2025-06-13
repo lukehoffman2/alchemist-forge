@@ -144,7 +144,43 @@ hudTemplate.innerHTML = `
       width: 40px;
       height: 40px;
     }
+
+    #inventory-panel {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      width: 250px; /* Adjust as needed */
+      max-height: 400px; /* Adjust as needed */
+      overflow-y: auto; /* For scrollable inventory */
+      background-color: rgba(0, 0, 0, 0.7);
+      border: 2px solid rgba(255, 255, 255, 0.3);
+      border-radius: 10px;
+      padding: 15px;
+      color: white;
+      display: none; /* Hidden by default */
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+    #inventory-panel h3 {
+      margin-top: 0;
+      text-align: center;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+      padding-bottom: 10px;
+      margin-bottom: 10px;
+    }
+    .inventory-item {
+      display: flex;
+      justify-content: space-between;
+      padding: 5px 0;
+      font-size: 14px;
+    }
+    .inventory-item span:first-child {
+      text-transform: capitalize;
+    }
   </style>
+
+  <div id="inventory-panel">
+    <!-- Inventory items will be populated here -->
+  </div>
 
   <div class="bottom-hud">
     <div class="tool-selector">
@@ -171,6 +207,7 @@ export class GameHudComponent extends HTMLElement {
     private armorBarFill!: HTMLElement;
     private currentToolSlot!: HTMLElement;
     private toolOptionsPopup!: HTMLElement;
+    private inventoryPanel!: HTMLElement;
 
     private tools: ToolInfo[] = [];
     private currentToolIndex = 0;
@@ -186,6 +223,7 @@ export class GameHudComponent extends HTMLElement {
         this.armorBarFill = this.shadowRoot!.getElementById('armor-bar-fill')!;
         this.currentToolSlot = this.shadowRoot!.getElementById('current-tool')!;
         this.toolOptionsPopup = this.shadowRoot!.getElementById('tool-options-popup')!;
+        this.inventoryPanel = this.shadowRoot!.getElementById('inventory-panel')!;
     }
 
     // This lifecycle method is called when the element is added to the page.
@@ -236,6 +274,58 @@ export class GameHudComponent extends HTMLElement {
         [this.currentToolIndex, this.lastUsedToolIndex] = [this.lastUsedToolIndex, this.currentToolIndex];
         this.updateCurrentToolDisplay();
         console.log(`HUD: Toggled to ${this.tools[this.currentToolIndex].name}`);
+    }
+
+    public setInventory(inventory: { resources: Record<string, number>, materials: Record<string, number> }): void {
+        this.inventoryPanel.innerHTML = '<h3>Inventory</h3>'; // Clear and add title
+
+        // Helper function to create and append items
+        const createItemElement = (name: string, count: number) => {
+            const itemDiv = document.createElement('div');
+            itemDiv.className = 'inventory-item';
+            itemDiv.innerHTML = `<span>${name}</span><span>${count}</span>`;
+            return itemDiv;
+        };
+
+        let hasItems = false;
+
+        // Add Resources
+        for (const resourceName in inventory.resources) {
+            if (inventory.resources[resourceName] > 0) {
+                this.inventoryPanel.appendChild(createItemElement(resourceName, inventory.resources[resourceName]));
+                hasItems = true;
+            }
+        }
+
+        // Add Materials (optional: with a sub-heading)
+        // If you want a sub-heading for materials:
+        // if (Object.values(inventory.materials).some(count => count > 0)) {
+        //   const materialsTitle = document.createElement('h4');
+        //   materialsTitle.textContent = 'Materials';
+        //   materialsTitle.style.marginTop = '10px'; // Add some spacing
+        //   materialsTitle.style.borderTop = '1px solid rgba(255,255,255,0.1)';
+        //   materialsTitle.style.paddingTop = '10px';
+        //   this.inventoryPanel.appendChild(materialsTitle);
+        // }
+        for (const materialName in inventory.materials) {
+            if (inventory.materials[materialName] > 0) {
+                this.inventoryPanel.appendChild(createItemElement(materialName, inventory.materials[materialName]));
+                hasItems = true;
+            }
+        }
+
+        if (!hasItems) {
+            const emptyMsg = document.createElement('p');
+            emptyMsg.textContent = 'Your inventory is empty.';
+            emptyMsg.style.textAlign = 'center';
+            emptyMsg.style.fontSize = '13px';
+            emptyMsg.style.color = 'rgba(255,255,255,0.6)';
+            this.inventoryPanel.appendChild(emptyMsg);
+        }
+    }
+
+    public toggleInventoryDisplay(visible: boolean): void {
+        this.inventoryPanel.style.display = visible ? 'block' : 'none';
     }
 
     // --- PRIVATE METHODS ---
