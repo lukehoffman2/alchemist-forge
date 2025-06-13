@@ -37,6 +37,10 @@ class InputHandler {
     private minPitch: number; // ADDED
     private maxPitch: number; // ADDED
 
+    private qKeyTimer: number | null = null;
+    private qKeyLongPressDetected: boolean = false;
+    private readonly longPressThreshold: number = 300; // milliseconds
+
     // UPDATED: The constructor now accepts minPitch and maxPitch
     constructor(
         gameState: GameState,
@@ -138,14 +142,23 @@ class InputHandler {
 
         if (key === 'e') this.callbacks.onAction?.();
 
-        // 'q' now calls our new quick toggle handler
-        if (key === 'q') this.callbacks.onToggleTool?.();
-
-        // Let's use 'Tab' to show the tool selection popup
-        if (key === 'tab') {
-            event.preventDefault(); // Prevent tabbing to other elements
-            this.callbacks.onToggleToolPopup?.();
+        // 'q' key long press logic
+        if (key === 'q') {
+            if (!this.qKeyTimer) { // Only start a new timer if one isn't already running
+                this.qKeyLongPressDetected = false;
+                this.qKeyTimer = window.setTimeout(() => {
+                    this.qKeyLongPressDetected = true;
+                    this.callbacks.onToggleToolPopup?.();
+                    this.qKeyTimer = null; // Clear the timer ID after execution
+                }, this.longPressThreshold);
+            }
         }
+
+        // Removed 'tab' key functionality for tool popup
+        // if (key === 'tab') {
+        //     event.preventDefault(); // Prevent tabbing to other elements
+        //     this.callbacks.onToggleToolPopup?.();
+        // }
 
         if (key === 'f') this.callbacks.onToggleForgeUI?.();
 
@@ -159,7 +172,20 @@ class InputHandler {
     }
 
     private onKeyUp(event: KeyboardEvent): void {
-        this.gameState.setKeyPressed(event.key.toLowerCase(), false);
+        const key = event.key.toLowerCase();
+        this.gameState.setKeyPressed(key, false);
+
+        if (key === 'q') {
+            if (this.qKeyTimer) {
+                clearTimeout(this.qKeyTimer);
+                this.qKeyTimer = null;
+                if (!this.qKeyLongPressDetected) {
+                    this.callbacks.onToggleTool?.();
+                }
+            }
+            // Reset long press detection for the next key press cycle
+            this.qKeyLongPressDetected = false;
+        }
     }
 
     private onMouseMove(event: MouseEvent): void {

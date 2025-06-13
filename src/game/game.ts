@@ -90,6 +90,7 @@ class Game {
     private lastTime: number = 0;
     private messageTimeout: number | null = null;
     private forgeTabsInitialized: boolean = false;
+    private wasPointerLockedBeforePopup: boolean = false;
 
 
     constructor() {
@@ -205,12 +206,22 @@ class Game {
             onWindowResize: this.handleWindowResize.bind(this),
             // ADDED: Logic to handle the popup
             onToggleToolPopup: () => {
-                if (this.hud?.isPopupVisible()) {
+                if (this.hud?.isPopupVisible()) { // Popup is currently visible, so we are hiding it
                     this.hud.hideToolPopup();
-                    this.gameState.isToolPopupVisible = false
-                } else {
+                    this.gameState.isToolPopupVisible = false;
+                    if (this.wasPointerLockedBeforePopup && !this.gameState.isPaused) {
+                        document.body.requestPointerLock();
+                    }
+                    this.wasPointerLockedBeforePopup = false; // Reset flag
+                } else { // Popup is currently hidden, so we are showing it
+                    if (document.pointerLockElement) {
+                        this.wasPointerLockedBeforePopup = true;
+                        document.exitPointerLock();
+                    } else {
+                        this.wasPointerLockedBeforePopup = false;
+                    }
                     this.hud?.showToolPopup();
-                    this.gameState.isToolPopupVisible = true
+                    this.gameState.isToolPopupVisible = true;
                 }
             },
             onToggleInventory: () => {
@@ -224,6 +235,16 @@ class Game {
                 }
             }
         });
+
+        // Event listener for tool selection from HUD
+        if (this.hud) {
+            this.hud.addEventListener('tool-selected', (event: Event) => {
+                const customEvent = event as CustomEvent<{ toolId: Tool }>;
+                if (customEvent.detail && customEvent.detail.toolId) {
+                    this.handleToolSelectionFromPopup(customEvent.detail.toolId);
+                }
+            });
+        }
 
         // TS-FIX: Add null checks for all DOM interactions.
         document.getElementById('equipment-ui-button')?.addEventListener('click', () => {
@@ -242,6 +263,39 @@ class Game {
                 }
             });
         });
+    }
+
+    private handleToolSelectionFromPopup(selectedToolId: Tool): void {
+        // a. Set the player's equipped tool using GameState
+        this.gameState.toggleTool(selectedToolId, true);
+
+        // b. Explicitly update the HUD to reflect the change
+        if (this.hud) {
+            this.hud.setActiveTool(selectedToolId);
+        }
+
+        // Update 3D tool model visibility
+        if (this.pickaxe && this.axe) {
+            this.pickaxe.visible = (selectedToolId === 'pickaxe');
+            this.axe.visible = (selectedToolId === 'axe');
+        }
+
+        // c. Hide the popup
+        if (this.hud) {
+            this.hud.hideToolPopup();
+        }
+
+        // d. Update game state for popup visibility
+        this.gameState.isToolPopupVisible = false;
+
+        // e. Handle re-locking pointer
+        if (this.wasPointerLockedBeforePopup && !this.gameState.isPaused) {
+            document.body.requestPointerLock();
+        }
+        this.wasPointerLockedBeforePopup = false; // Reset flag
+
+        // f. Optional: Show a game message
+        this.showGameMessage(`Equipped ${selectedToolId}`, 1000);
     }
 
     // --- World Creation Methods ---
