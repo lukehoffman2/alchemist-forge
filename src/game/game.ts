@@ -767,20 +767,23 @@ class Game {
         const tool = equippedTool === 'pickaxe' ? this.pickaxe : this.axe;
         const duration = equippedTool === 'pickaxe' ? this.MINE_DURATION : this.CHOP_DURATION;
 
+        // Store the target *before* it's potentially nulled by updateAction
+        const actionTarget = this.gameState.currentActionTarget;
+
         this.renderSystem.updateToolAnimation(tool, this.gameState.actionProgress, duration);
         const result = this.gameState.updateAction(deltaTime, duration);
 
-        if (result?.completed) {
+        if (result?.completed && actionTarget) { // Also check if actionTarget is not null
             this.showGameMessage(`+1 ${result.resourceKey}!`, 2000);
             this.updateInventoryDisplay();
 
-            this.renderSystem.hideResource(this.gameState.currentActionTarget);
-            const targetToRespawn = this.gameState.currentActionTarget;
-            const userData = targetToRespawn.userData as ResourceUserData;
+            this.renderSystem.hideResource(actionTarget); // Use the stored target
+            // const targetToRespawn = actionTarget; // No need for a new variable, just use actionTarget
+            const userData = actionTarget.userData as ResourceUserData; // Use the stored target
 
             if (userData.respawnTimer === null) {
                 userData.respawnTimer = window.setTimeout(() => {
-                    this.renderSystem!.showResource(targetToRespawn);
+                    this.renderSystem!.showResource(actionTarget); // Use the stored target
                     userData.respawnTimer = null;
                 }, 20000 + Math.random() * 10000);
             }
