@@ -11,6 +11,7 @@ interface InputHandlerCallbacks {
     onWindowResize?: () => void;
     // We can add a new callback for the tool popup
     onToggleToolPopup?: () => void;
+    onToggleInventory?: () => void;
 }
 
 interface GeminiRequestPayload {
@@ -119,6 +120,13 @@ class InputHandler {
         if (key === 'escape') {
             this.callbacks.onPause?.();
             return;
+        }
+
+        if (key === 'i') {
+            this.callbacks.onToggleInventory?.();
+            // We might want to return here if 'i' should only toggle inventory
+            // and not also be registered as a pressed key for other game mechanics.
+            // For now, let's allow it to be registered.
         }
 
         // Add a check for the tool popup
