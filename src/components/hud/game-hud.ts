@@ -345,8 +345,24 @@ export class GameHudComponent extends HTMLElement {
     private handleToolClick(event: MouseEvent): void {
         const target = (event.target as HTMLElement).closest('.tool-option') as HTMLElement | null;
         if (target && target.dataset.tool) {
-            this.equipTool(target.dataset.tool as Tool);
-            this.hideToolPopup();
+            const toolId = target.dataset.tool as Tool;
+            // Dispatch an event so the game logic can handle the state change
+            this.dispatchEvent(new CustomEvent('tool-selected', {
+                detail: { toolId },
+                bubbles: true, // Allows the event to bubble up if needed
+                composed: true // Allows the event to cross shadow DOM boundaries
+            }));
+            // The game logic will be responsible for hiding the popup now
+            // this.hideToolPopup();
+        }
+    }
+
+    public setActiveTool(toolId: Tool): void {
+        const newIndex = this.tools.findIndex(t => t.id === toolId);
+        if (newIndex !== -1) {
+            // This is a direct set, do not modify lastUsedToolIndex here.
+            this.currentToolIndex = newIndex;
+            this.updateCurrentToolDisplay();
         }
     }
 
