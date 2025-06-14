@@ -253,8 +253,12 @@ export class GameHudComponent extends HTMLElement {
         this.healthBarFill.style.width = `${Math.max(0, Math.min(100, percentage))}%`;
     }
 
-    public setArmor(percentage: number): void {
+    public setArmor(currentArmor: number, referenceMax: number): void {
+        const percentage = referenceMax > 0 ? (currentArmor / referenceMax) * 100 : 0;
         this.armorBarFill.style.width = `${Math.max(0, Math.min(100, percentage))}%`;
+        // Optional: Add text display for armor values if desired, e.g.
+        // const armorTextElement = this.shadowRoot!.getElementById('armor-text');
+        // if (armorTextElement) armorTextElement.textContent = `${currentArmor} / ${referenceMax}`;
     }
 
     public showToolPopup(): void {
@@ -280,39 +284,63 @@ export class GameHudComponent extends HTMLElement {
         this.inventoryPanel.innerHTML = '<h3>Inventory</h3>'; // Clear and add title
 
         // Helper function to create and append items
+        const formatItemName = (rawName: string): string => {
+            // Convert camelCase (e.g., "ironIngot") to Title Case (e.g., "Iron Ingot")
+            // Replace "Ingot" with " Ingot", then add spaces before other capital letters.
+            let formatted = rawName.replace(/([A-Z])/g, ' $1').replace(/Ingot/g, ' Ingot');
+            // Capitalize first letter and trim whitespace
+            formatted = formatted.charAt(0).toUpperCase() + formatted.slice(1).trim();
+            // Specific replacements if needed (e.g. "Obsidian" instead of "Worked Obsidian" if "workedObsidian" is a key)
+            if (rawName === "workedObsidian") return "Worked Obsidian";
+            return formatted;
+        };
+
         const createItemElement = (name: string, count: number) => {
             const itemDiv = document.createElement('div');
             itemDiv.className = 'inventory-item';
-            itemDiv.innerHTML = `<span>${name}</span><span>${count}</span>`;
+            // Use formatted name for display
+            itemDiv.innerHTML = `<span>${formatItemName(name)}</span><span>${count}</span>`;
             return itemDiv;
         };
 
         let hasItems = false;
 
         // Add Resources
-        for (const resourceName in inventory.resources) {
-            if (inventory.resources[resourceName] > 0) {
-                this.inventoryPanel.appendChild(createItemElement(resourceName, inventory.resources[resourceName]));
-                hasItems = true;
+        if (Object.values(inventory.resources).some(count => count > 0)) {
+            // Optional: Add a sub-header for resources if you want to distinguish sections
+            // const resourcesTitle = document.createElement('h4');
+            // resourcesTitle.textContent = 'Resources';
+            // ... style and append resourcesTitle ...
+            // this.inventoryPanel.appendChild(resourcesTitle);
+
+            for (const resourceName in inventory.resources) {
+                if (inventory.resources[resourceName] > 0) {
+                    this.inventoryPanel.appendChild(createItemElement(resourceName, inventory.resources[resourceName]));
+                    hasItems = true;
+                }
             }
         }
 
-        // Add Materials (optional: with a sub-heading)
-        // If you want a sub-heading for materials:
-        // if (Object.values(inventory.materials).some(count => count > 0)) {
-        //   const materialsTitle = document.createElement('h4');
-        //   materialsTitle.textContent = 'Materials';
-        //   materialsTitle.style.marginTop = '10px'; // Add some spacing
-        //   materialsTitle.style.borderTop = '1px solid rgba(255,255,255,0.1)';
-        //   materialsTitle.style.paddingTop = '10px';
-        //   this.inventoryPanel.appendChild(materialsTitle);
-        // }
-        for (const materialName in inventory.materials) {
-            if (inventory.materials[materialName] > 0) {
-                this.inventoryPanel.appendChild(createItemElement(materialName, inventory.materials[materialName]));
-                hasItems = true;
+
+        // Add Materials
+        if (Object.values(inventory.materials).some(count => count > 0)) {
+            // Optional: Add a sub-header for materials
+            const materialsTitle = document.createElement('h4');
+            materialsTitle.textContent = 'Ingots & Materials';
+            materialsTitle.style.marginTop = '10px';
+            materialsTitle.style.borderTop = '1px solid rgba(255,255,255,0.1)';
+            materialsTitle.style.paddingTop = '10px';
+            materialsTitle.style.fontSize = '1em'; // Make it a bit smaller than H3
+            this.inventoryPanel.appendChild(materialsTitle);
+
+            for (const materialName in inventory.materials) {
+                if (inventory.materials[materialName] > 0) {
+                    this.inventoryPanel.appendChild(createItemElement(materialName, inventory.materials[materialName]));
+                    hasItems = true;
+                }
             }
         }
+
 
         if (!hasItems) {
             const emptyMsg = document.createElement('p');

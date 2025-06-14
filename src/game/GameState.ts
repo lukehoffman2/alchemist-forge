@@ -8,13 +8,13 @@ import * as THREE from 'three'; // <--- ADD THIS LINE
 // --- TYPE DEFINITIONS ---
 
 // Using string literal types prevents typos, e.g., using 'cooper' instead of 'copper'.
-type ResourceName = 'wood' | 'copper' | 'iron' | 'gold' | 'silver' | 'mithril' | 'adamantite' | 'obsidian' | 'coal';
+export type ResourceName = 'wood' | 'copper' | 'iron' | 'gold' | 'silver' | 'mithril' | 'adamantite' | 'obsidian' | 'coal';
 type AlloyName = 'bronzeIngot' | 'steelIngot' | 'electrumIngot' | 'mithrilSteelIngot' | 'adamantiteSteelIngot';
 type BasicIngotName = 'copperIngot' | 'ironIngot' | 'goldIngot' | 'silverIngot' | 'mithrilIngot' | 'adamantiteIngot' | 'workedObsidian';
 type MaterialName = BasicIngotName | AlloyName;
 
 type EquipmentType = 'weapon' | 'shield' | 'helmet' | 'chestplate' | 'leggings' | 'gauntlets' | 'boots';
-type EquipmentSlot = 'head' | 'chest' | 'legs' | 'hands' | 'feet' | 'mainHand' | 'offHand';
+export type EquipmentSlot = 'head' | 'chest' | 'legs' | 'hands' | 'feet' | 'mainHand' | 'offHand';
 export type Tool = 'pickaxe' | 'axe';
 
 // --- INTERFACE DEFINITIONS ---
@@ -359,6 +359,46 @@ class GameState {
         return this.forgeState;
     }
 
+    // --- ARMOR CRAFTING ---
+    // Define a type for armor recipes
+    public getArmorRecipes(): Record<string, ArmorRecipe> {
+        return ARMOR_RECIPES;
+    }
+
+    public craftArmorItem(recipeName: string): string | null {
+        const recipe = ARMOR_RECIPES[recipeName];
+        if (!recipe) {
+            console.warn(`No recipe found for ${recipeName}`);
+            return null;
+        }
+
+        // Check if player has enough materials
+        for (const material in recipe.materialsRequired) {
+            const requiredAmount = recipe.materialsRequired[material as MaterialName]!;
+            if (!this.inventory.materials[material as MaterialName] || this.inventory.materials[material as MaterialName] < requiredAmount) {
+                console.log(`Not enough ${material} to craft ${recipeName}`);
+                return null; // Not enough materials
+            }
+        }
+
+        // Consume materials
+        for (const material in recipe.materialsRequired) {
+            this.removeResource(material as MaterialName, recipe.materialsRequired[material as MaterialName]);
+        }
+
+        // Create equipment
+        const newItemId = this.createEquipment(
+            recipe.item.type,
+            recipe.item.name,
+            recipe.item.stats,
+            recipe.item.durability
+        );
+
+        console.log(`${recipeName} crafted successfully! Item ID: ${newItemId}`);
+        return newItemId; // Return the ID of the newly crafted item
+    }
+
+
     // --- INPUT HANDLING ---
     public setKeyPressed(key: string, isPressed: boolean): void {
         this.keysPressed[key] = isPressed;
@@ -370,3 +410,54 @@ class GameState {
 }
 
 export default GameState;
+
+// --- CONSTANTS & CONFIGURATION --- (Often good to place at the end or in a separate config file)
+
+export interface ArmorRecipe {
+    materialsRequired: Partial<Record<MaterialName, number>>; // e.g., { ironIngot: 3 }
+    item: {
+        name: string;
+        type: EquipmentType;
+        stats: ItemStats;
+        durability: number;
+    };
+}
+
+// Example recipes - these could be expanded or moved to a JSON file later
+const ARMOR_RECIPES: Record<string, ArmorRecipe> = {
+    "Iron Helmet": {
+        materialsRequired: { ironIngot: 3 },
+        item: { name: "Iron Helmet", type: 'helmet', stats: { armor: 10 }, durability: 100 }
+    },
+    "Iron Chestplate": {
+        materialsRequired: { ironIngot: 5 },
+        item: { name: "Iron Chestplate", type: 'chestplate', stats: { armor: 25 }, durability: 150 }
+    },
+    "Iron Leggings": {
+        materialsRequired: { ironIngot: 4 },
+        item: { name: "Iron Leggings", type: 'leggings', stats: { armor: 18 }, durability: 130 }
+    },
+    "Iron Boots": {
+        materialsRequired: { ironIngot: 2 },
+        item: { name: "Iron Boots", type: 'boots', stats: { armor: 7 }, durability: 90 }
+    },
+    // Example for a different material type (if you add Bronze later)
+    "Bronze Helmet": {
+        materialsRequired: { bronzeIngot: 3 }, // Assuming bronzeIngot is a valid MaterialName
+        item: { name: "Bronze Helmet", type: 'helmet', stats: { armor: 8 }, durability: 80 }
+    },
+    "Bronze Chestplate": {
+        materialsRequired: { bronzeIngot: 5 },
+        item: { name: "Bronze Chestplate", type: 'chestplate', stats: { armor: 20 }, durability: 120 }
+    },
+    "Bronze Leggings": {
+        materialsRequired: { bronzeIngot: 4 },
+        item: { name: "Bronze Leggings", type: 'leggings', stats: { armor: 15 }, durability: 110 }
+    },
+    "Bronze Boots": {
+        materialsRequired: { bronzeIngot: 2 },
+        item: { name: "Bronze Boots", type: 'boots', stats: { armor: 6 }, durability: 70 }
+    }
+    // Add more recipes here for different materials (Gold, Silver, Mithril etc.)
+    // e.g. "Gold Helmet", "Mithril Boots"
+};
