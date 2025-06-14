@@ -8,13 +8,13 @@ import * as THREE from 'three'; // <--- ADD THIS LINE
 // --- TYPE DEFINITIONS ---
 
 // Using string literal types prevents typos, e.g., using 'cooper' instead of 'copper'.
-type ResourceName = 'wood' | 'copper' | 'iron' | 'gold' | 'silver' | 'mithril' | 'adamantite' | 'obsidian' | 'coal';
+export type ResourceName = 'wood' | 'copper' | 'iron' | 'gold' | 'silver' | 'mithril' | 'adamantite' | 'obsidian' | 'coal';
 type AlloyName = 'bronzeIngot' | 'steelIngot' | 'electrumIngot' | 'mithrilSteelIngot' | 'adamantiteSteelIngot';
 type BasicIngotName = 'copperIngot' | 'ironIngot' | 'goldIngot' | 'silverIngot' | 'mithrilIngot' | 'adamantiteIngot' | 'workedObsidian';
 type MaterialName = BasicIngotName | AlloyName;
 
 type EquipmentType = 'weapon' | 'shield' | 'helmet' | 'chestplate' | 'leggings' | 'gauntlets' | 'boots';
-type EquipmentSlot = 'head' | 'chest' | 'legs' | 'hands' | 'feet' | 'mainHand' | 'offHand';
+export type EquipmentSlot = 'head' | 'chest' | 'legs' | 'hands' | 'feet' | 'mainHand' | 'offHand';
 export type Tool = 'pickaxe' | 'axe';
 
 // --- INTERFACE DEFINITIONS ---
@@ -374,7 +374,7 @@ class GameState {
 
         // Check if player has enough materials
         for (const material in recipe.materialsRequired) {
-            const requiredAmount = recipe.materialsRequired[material as MaterialName];
+            const requiredAmount = recipe.materialsRequired[material as MaterialName]!;
             if (!this.inventory.materials[material as MaterialName] || this.inventory.materials[material as MaterialName] < requiredAmount) {
                 console.log(`Not enough ${material} to craft ${recipeName}`);
                 return null; // Not enough materials
@@ -413,7 +413,7 @@ export default GameState;
 
 // --- CONSTANTS & CONFIGURATION --- (Often good to place at the end or in a separate config file)
 
-interface ArmorRecipe {
+export interface ArmorRecipe {
     materialsRequired: Partial<Record<MaterialName, number>>; // e.g., { ironIngot: 3 }
     item: {
         name: string;

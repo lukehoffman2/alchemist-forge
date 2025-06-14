@@ -187,7 +187,7 @@ class InputHandler {
             this.qKeyLongPressDetected = false; // Reset for next press
         }
 
-        if (key === 'e') { // 'E' key to toggle equipment UI
+        if (key === 'b') { // 'B' key to toggle equipment UI
             this.callbacks.onToggleEquipmentUI?.();
         }
     }

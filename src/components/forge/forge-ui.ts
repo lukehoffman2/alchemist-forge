@@ -225,14 +225,13 @@ export class ForgeUiComponent extends HTMLElement {
             button.className = 'bg-blue-700 hover:bg-blue-600 text-white font-bold py-2 px-3 rounded text-sm'; // Adjusted styling for potentially longer text
 
             let canCraft = true;
-            for (const materialKey in recipe.materialsRequired) {
-                const materialName = materialKey as import('../../game/GameState').MaterialName;
+            (Object.keys(recipe.materialsRequired) as Array<keyof typeof recipe.materialsRequired>).forEach(materialName => {
                 const requiredAmount = recipe.materialsRequired[materialName]!;
-                if (!inventoryMaterials[materialName] || inventoryMaterials[materialName] < requiredAmount) {
+                const hasAmount = inventoryMaterials[materialName] || 0;
+                if (hasAmount < requiredAmount) {
                     canCraft = false;
-                    break;
                 }
-            }
+            });
 
             button.disabled = !canCraft;
             button.style.opacity = canCraft ? '1' : '0.5';

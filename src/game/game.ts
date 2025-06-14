@@ -19,7 +19,7 @@ interface OreType {
 }
 
 
-// TS-FIX: It's good practice to define types for complex userData structures
+// It's good practice to define types for complex userData structures
 // to ensure consistency when you access them later.
 interface ResourceUserData {
     type: string;
@@ -54,7 +54,7 @@ class Game {
     private ores: THREE.Mesh[] = [];
     private trees: THREE.Group[] = [];
     private combatDummy: THREE.Group | null = null;
-    private hud: GameHudComponent | null = null; // Add a property for the HUD
+    private hud: GameHudComponent | null = null;
 
     // Constants
     private readonly playerSpeed: number = 0.12;
@@ -90,7 +90,6 @@ class Game {
     private animationFrameId: number | null = null;
     private lastTime: number = 0;
     private messageTimeout: number | null = null;
-    private forgeTabsInitialized: boolean = false;
     private wasPointerLockedBeforePopup: boolean = false;
 
 
@@ -98,22 +97,44 @@ class Game {
         this.gameState = new GameState();
     }
 
-    public init(): void {
+    public async init(): Promise<void> {
         this.initScene();
 
+        await Promise.all([
+            customElements.whenDefined('game-hud'),
+            customElements.whenDefined('forge-ui'),
+            customElements.whenDefined('equipment-ui')
+        ]);
+
+        // THE BELOW COMMENTS MAY BE USEFUL FOR DEBUGGING LATER
+        // console.log("Waiting for UI components to be defined...");
+        //
+        // await customElements.whenDefined('game-hud');
+        // console.log("✅ Game HUD is ready.");
+        //
+        // await customElements.whenDefined('equipment-ui');
+        // console.log("✅ Equipment UI is ready.");
+        //
+        // console.log("⏳ Waiting for Forge UI...");
+        // await customElements.whenDefined('forge-ui');
+        // console.log("✅ Forge UI is ready."); // <--- My guess is you will NOT see this log message.
+        //
+        // console.log("All UI components are ready!");
+
         // Find the HUD component in the DOM
-        this.hud = document.querySelector('game-hud');
+        this.hud = document.querySelector<GameHudComponent>('game-hud');
         if (!this.hud) {
             console.error("Fatal: <game-hud> element not found in DOM!");
             return;
         }
+
         // Find the ForgeUI component in the DOM
-        this.forgeUi = document.querySelector('forge-ui');
+        this.forgeUi = document.querySelector<ForgeUiComponent>('forge-ui');
         if (!this.forgeUi) {
             console.error("Fatal: <forge-ui> element not found in DOM! Make sure it's in index.html.");
-            // Depending on how critical ForgeUI is, you might return or just log an error.
         }
-        this.equipmentUi = document.querySelector('equipment-ui');
+
+        this.equipmentUi = document.querySelector<EquipmentUiComponent>('equipment-ui');
         if (!this.equipmentUi) {
             console.error("Fatal: <equipment-ui> element not found in DOM! Make sure it's in index.html.");
         } else {
@@ -194,7 +215,7 @@ class Game {
         this.createPlayerAndTools();
         this.createWorldResources();
 
-        this.updateInventoryDisplay();
+        this.updatePlayerStatsDisplay();
     }
 
     private initRenderer(): void {
@@ -230,17 +251,17 @@ class Game {
             onAction: this.startAction.bind(this),
             onToggleTool: this.handleQuickToggleTool.bind(this),
             onToggleForgeUI: this.toggleForgeUI.bind(this),
-            onToggleEquipmentUI: this.toggleEquipmentUI.bind(this), // Added callback for equipment UI
+            onToggleEquipmentUI: this.toggleEquipmentUI.bind(this),
             onWindowResize: this.handleWindowResize.bind(this),
             onToggleToolPopup: () => {
-                if (this.hud?.isPopupVisible()) { // Popup is currently visible, so we are hiding it
+                if (this.hud?.isPopupVisible()) {
                     this.hud.hideToolPopup();
                     this.gameState.isToolPopupVisible = false;
                     if (this.wasPointerLockedBeforePopup && !this.gameState.isPaused) {
                         document.body.requestPointerLock();
                     }
-                    this.wasPointerLockedBeforePopup = false; // Reset flag
-                } else { // Popup is currently hidden, so we are showing it
+                    this.wasPointerLockedBeforePopup = false;
+                } else {
                     if (document.pointerLockElement) {
                         this.wasPointerLockedBeforePopup = true;
                         document.exitPointerLock();
@@ -252,10 +273,9 @@ class Game {
                 }
             },
             onToggleInventory: () => {
-                if (this.hud) { // Ensure hud is available
+                if (this.hud) {
                     const newVisibility = this.gameState.toggleInventoryVisibility();
                     this.hud.toggleInventoryDisplay(newVisibility);
-                    // If inventory is now visible, update its content
                     if (newVisibility) {
                         this.hud.setInventory(this.gameState.getStructuredInventory());
                     }
@@ -263,7 +283,6 @@ class Game {
             }
         });
 
-        // Event listener for tool selection from HUD
         if (this.hud) {
             this.hud.addEventListener('tool-selected', (event: Event) => {
                 const customEvent = event as CustomEvent<{ toolId: Tool }>;
@@ -272,63 +291,36 @@ class Game {
                 }
             });
         }
-
-        // TS-FIX: Add null checks for all DOM interactions.
-        // The old direct DOM manipulation for equipment UI toggling and slot clicks are removed
-        // as the new EquipmentUiComponent handles its own internal logic, including the close button.
-        // The 'E' key (or other assigned key) will now call toggleEquipmentUI.
-        // document.getElementById('equipment-ui-button')?.addEventListener('click', () => {
-        // this.toggleEquipmentUI();
-        // });
-        // document.getElementById('close-equipment-ui')?.addEventListener('click', () => {
-        // this.toggleEquipmentUI(false);
-        // });
-        // document.querySelectorAll('.equipment-slot').forEach(slot => {
-        // slot.addEventListener('click', () => {
-        // const slotName = (slot as HTMLElement).dataset.slot;
-        // if (slotName) {
-        // this.handleEquipmentSlotClick(slotName);
-        // }
-        // });
-        // });
     }
 
     private handleToolSelectionFromPopup(selectedToolId: Tool): void {
-        // a. Set the player's equipped tool using GameState
         this.gameState.toggleTool(selectedToolId, true);
 
-        // b. Explicitly update the HUD to reflect the change
         if (this.hud) {
             this.hud.setActiveTool(selectedToolId);
         }
 
-        // Update 3D tool model visibility
         if (this.pickaxe && this.axe) {
             this.pickaxe.visible = (selectedToolId === 'pickaxe');
             this.axe.visible = (selectedToolId === 'axe');
         }
 
-        // c. Hide the popup
         if (this.hud) {
             this.hud.hideToolPopup();
         }
 
-        // d. Update game state for popup visibility
         this.gameState.isToolPopupVisible = false;
 
-        // e. Handle re-locking pointer
         if (this.wasPointerLockedBeforePopup && !this.gameState.isPaused) {
             document.body.requestPointerLock();
         }
-        this.wasPointerLockedBeforePopup = false; // Reset flag
+        this.wasPointerLockedBeforePopup = false;
 
-        // f. Optional: Show a game message
         this.showGameMessage(`Equipped ${selectedToolId}`, 1000);
     }
 
     // --- World Creation Methods ---
     private addLights(): void {
-        // TS-FIX: Use the non-null assertion `!` because we know `this.scene` was just initialized.
         this.scene!.add(new THREE.AmbientLight(0xffffff, 0.7));
         const dirLight = new THREE.DirectionalLight(0xffffff, 0.9);
         dirLight.position.set(20, 40, 15);
@@ -412,7 +404,6 @@ class Game {
     }
 
     private createWorldResources(): void {
-        // Create ores
         Object.values(this.ORE_TYPES).forEach(type => {
             for (let i = 0; i < type.count; i++) {
                 const oreGeo = new THREE.DodecahedronGeometry(type.size * 0.6, 0);
@@ -431,7 +422,6 @@ class Game {
                 );
                 ore.castShadow = true;
                 ore.receiveShadow = true;
-                // TS-FIX: Use our typed interface for userData
                 ore.userData = { type: type.name, resourceType: 'ore', respawnTimer: null } as ResourceUserData;
 
                 this.scene!.add(ore);
@@ -439,7 +429,6 @@ class Game {
             }
         });
 
-        // Create trees
         const forestX = -this.MAP_SIZE / 2 + 10;
         const forestZ = this.MAP_SIZE / 2 - 10;
         for (let i = 0; i < this.TREE_COUNT; i++) {
@@ -562,9 +551,7 @@ class Game {
                 }
                 console.log('Forge model loaded successfully');
             },
-            (xhr) => {
-                console.log((xhr.loaded / xhr.total * 100) + '% loaded');
-            },
+            undefined, // onProgress callback is not used
             (error) => {
                 console.error('An error happened loading the forge model:', error);
                 this.createFallbackForge();
@@ -576,8 +563,9 @@ class Game {
         console.log('Creating fallback forge');
         if (!this.forge) return;
 
-        while (this.forge.children.length > 0) {
-            this.forge.remove(this.forge.children[0]);
+        // FIX 1: Safely remove all children to prevent an infinite loop.
+        for (let i = this.forge.children.length - 1; i >= 0; i--) {
+            this.forge.remove(this.forge.children[i]);
         }
 
         const forgeBase = new THREE.Mesh(
@@ -609,8 +597,6 @@ class Game {
         this.gameState.createEquipment('leggings', 'Iron Leggings', { armor: 4 }, 100);
         this.gameState.equipItem('mainHand', bronzeSwordId);
 
-        // TS-FIX: Accessing nested properties that might not exist in the initial state
-        // should be done carefully. Let's assume `inventory` and `resources` are initialized.
         const resources = this.gameState.inventory.resources
         resources.copper = 20;
         resources.iron = 20;
@@ -619,6 +605,7 @@ class Game {
         resources.coal = 15;
 
         console.log('Test equipment added');
+        this.updatePlayerStatsDisplay(); // Update stats display after adding equipment
     }
 
     private togglePause(): void {
@@ -631,10 +618,8 @@ class Game {
         if (isPaused) {
             if (document.pointerLockElement) document.exitPointerLock();
         } else {
-            // Check if forge or equipment UI is open before locking pointer
-            const forgeUI = document.getElementById('forge-ui');
-            const equipmentUI = document.getElementById('equipment-ui');
-            if (forgeUI?.style.display !== 'block' && equipmentUI?.style.display !== 'block') {
+            // Re-lock pointer only if no other major UI panel is open
+            if (!this.forgeUi?.isVisible() && !this.equipmentUi?.isVisible()) {
                 document.body.requestPointerLock();
             }
             this.lastTime = performance.now();
@@ -646,7 +631,6 @@ class Game {
         if (newTool && this.pickaxe && this.axe) {
             this.pickaxe.visible = (newTool === 'pickaxe');
             this.axe.visible = (newTool === 'axe');
-            this.updateInventoryDisplay();
             this.showGameMessage(`Equipped ${newTool}`, 1000);
         }
     }
@@ -654,7 +638,6 @@ class Game {
     private startAction(): void {
         if (this.gameState.isInteracting || !this.player) return;
 
-        // ... (logic for checking weapon/combat dummy is fine)
         const playerStats = this.gameState.getPlayerStats();
         const mainHandItem = playerStats.equipment.mainHand
             ? this.gameState.getEquipment(playerStats.equipment.mainHand) : null;
@@ -673,7 +656,6 @@ class Game {
         const resourceList = equippedTool === 'pickaxe' ? this.ores : this.trees;
         let closestDistSq = this.INTERACTION_DISTANCE * this.INTERACTION_DISTANCE;
 
-        // TS-FIX: Replaced .forEach with a for...of loop for proper type inference.
         for (const res of resourceList) {
             if (res.visible) {
                 const distSq = this.player.position.distanceToSquared(res.position);
@@ -684,15 +666,12 @@ class Game {
             }
         }
 
-        // Now, TypeScript correctly understands that 'target' can have a value here.
         if (target) {
             this.gameState.startAction(target);
             const duration = equippedTool === 'pickaxe' ? this.MINE_DURATION : this.CHOP_DURATION;
-
             const resourceName = target.userData.resourceType === 'ore'
                 ? target.userData.type
                 : target.userData.resourceType;
-
             this.showGameMessage(`Gathering ${resourceName}...`, duration + 100);
         } else {
             this.showGameMessage(
@@ -737,79 +716,65 @@ class Game {
         }, 30000);
     }
 
-    private toggleForgeUI(): void {
-        if (!this.forgeUi || !this.player || !this.forge) return;
+    // --- (FIX 3) Centralized UI Panel Management ---
+    private setActiveUIPanel(panel: 'forge' | 'equipment' | 'none'): void {
+        const wasForgeVisible = this.forgeUi?.isVisible() ?? false;
+        const wasEquipmentVisible = this.equipmentUi?.isVisible() ?? false;
+        const wasAnyPanelVisible = wasForgeVisible || wasEquipmentVisible;
 
-        const distSq = this.player.position.distanceToSquared(this.forge.position);
+        // Hide all panels first
+        this.forgeUi?.hide();
+        this.equipmentUi?.hide();
+        if (this.hud && this.gameState.isInventoryVisible) {
+            this.gameState.toggleInventoryVisibility();
+            this.hud.toggleInventoryDisplay(false);
+        }
 
-        if (!this.forgeUi.isVisible() && distSq < (this.INTERACTION_DISTANCE * this.INTERACTION_DISTANCE)) {
-            this.forgeUi.show();
-            this.forgeUi.update(this.gameState); // Update UI with current state
-            if (document.pointerLockElement) document.exitPointerLock();
+        let isAPanelVisible = false;
 
-            // Hide other UI if necessary (e.g., equipment UI)
-            const equipmentUI = document.getElementById('equipment-ui');
-            if (equipmentUI) equipmentUI.style.display = 'none';
-            // Also ensure GameHud's inventory is hidden if forge is open
-            if (this.hud && this.gameState.isInventoryVisible) {
-                this.gameState.toggleInventoryVisibility(); //
-                this.hud.toggleInventoryDisplay(false);
+        // Show the requested panel
+        if (panel === 'forge') {
+            this.forgeUi?.show();
+            this.forgeUi?.update(this.gameState); // Update content when opened
+            isAPanelVisible = true;
+        } else if (panel === 'equipment') {
+            this.equipmentUi?.show();
+            this.equipmentUi?.update(this.gameState); // Update content when opened
+            isAPanelVisible = true;
+        }
+
+        // Manage pointer lock
+        if (isAPanelVisible && !wasAnyPanelVisible) {
+            // A panel was just opened
+            if (document.pointerLockElement) {
+                document.exitPointerLock();
             }
-
-
-        } else if (this.forgeUi.isVisible()) {
-            this.forgeUi.hide();
-            // Optional: Re-lock pointer if game is not paused and no other UI is open
+        } else if (!isAPanelVisible && wasAnyPanelVisible) {
+            // The last panel was just closed
             if (!this.gameState.isPaused) {
-                 // Check if equipment UI is also closed before locking
-                const equipmentUI = document.getElementById('equipment-ui');
-                if (!equipmentUI || equipmentUI.style.display === 'none') {
-                    document.body.requestPointerLock();
-                }
+                document.body.requestPointerLock();
             }
+        }
+    }
+
+    private toggleForgeUI(): void {
+        if (!this.player || !this.forge) return;
+
+        const isVisible = this.forgeUi?.isVisible() ?? false;
+
+        if (!isVisible) {
+            const distSq = this.player.position.distanceToSquared(this.forge.position);
+            if (distSq < (this.INTERACTION_DISTANCE * this.INTERACTION_DISTANCE)) {
+                this.setActiveUIPanel('forge');
+            }
+        } else {
+            this.setActiveUIPanel('none');
         }
     }
 
     private toggleEquipmentUI(): void {
-        if (!this.equipmentUi) return;
-
-        if (this.equipmentUi.isVisible()) {
-            this.equipmentUi.hide(); // This will trigger the 'equipment-ui-closed' event for pointer lock
-        } else {
-            // Hide other UIs
-            this.forgeUi?.hide();
-            if (this.hud && this.gameState.isInventoryVisible) {
-                 this.gameState.toggleInventoryVisibility(); // Update state
-                 this.hud.toggleInventoryDisplay(false); // Update HUD
-            }
-            // Show and update equipment UI
-            this.equipmentUi.show(); // This will trigger the 'equipment-ui-opened' event
-            this.equipmentUi.update(this.gameState);
-        }
-    }
-
-    // The old updateEquipmentUI is no longer needed as the component handles its own updates.
-    // Calls to it should be removed or re-evaluated.
-    // private updateEquipmentUI(): void {
-        // const playerStats = this.gameState.getPlayerStats();
-        // const equipment = this.gameState.getAllEquipment();
-        // ... existing code ...
-    // }
-
-
-    // This method was part of the old direct DOM manipulation system for equipment.
-    // It's not directly needed by the new component but leaving it commented out in case
-    // some advanced interaction (like clicking slots in the new UI to open inventory)
-    // is added later and needs to refer to this logic.
-    private handleEquipmentSlotClick(slot: string): void {
-        const playerStats = this.gameState.getPlayerStats();
-        const itemId = (playerStats.equipment as Record<string, string | null>)[slot];
-
-        if (itemId) {
-            this.showEquipmentDetails(itemId);
-        } else {
-            this.showEquipmentForSlot(slot);
-        }
+        const isVisible = this.equipmentUi?.isVisible() ?? false;
+        this.setActiveUIPanel(isVisible ? 'none' : 'equipment');
     }
 
     // --- Update Methods ---
@@ -844,24 +809,27 @@ class Game {
         const equippedTool = this.gameState.getEquippedTool();
         const tool = equippedTool === 'pickaxe' ? this.pickaxe : this.axe;
         const duration = equippedTool === 'pickaxe' ? this.MINE_DURATION : this.CHOP_DURATION;
-
-        // Store the target *before* it's potentially nulled by updateAction
         const actionTarget = this.gameState.currentActionTarget;
 
         this.renderSystem.updateToolAnimation(tool, this.gameState.actionProgress, duration);
         const result = this.gameState.updateAction(deltaTime, duration);
 
-        if (result?.completed && actionTarget) { // Also check if actionTarget is not null
-            this.showGameMessage(`+1 ${result.resourceKey}!`, 2000);
-            this.updateInventoryDisplay();
+        if (result?.completed) {
+            // FIX 2: Capture userData before the target object state might change.
+            const userData = actionTarget.userData as ResourceUserData;
 
-            this.renderSystem.hideResource(actionTarget); // Use the stored target
-            // const targetToRespawn = actionTarget; // No need for a new variable, just use actionTarget
-            const userData = actionTarget.userData as ResourceUserData; // Use the stored target
+            this.showGameMessage(`+1 ${result.resourceKey}!`, 2000);
+
+            // FIX 4: Update inventory display only when it changes.
+            if (this.hud && this.gameState.isInventoryVisible) {
+                this.hud.setInventory(this.gameState.getStructuredInventory());
+            }
+
+            this.renderSystem.hideResource(actionTarget);
 
             if (userData.respawnTimer === null) {
                 userData.respawnTimer = window.setTimeout(() => {
-                    this.renderSystem!.showResource(actionTarget); // Use the stored target
+                    this.renderSystem!.showResource(actionTarget);
                     userData.respawnTimer = null;
                 }, 20000 + Math.random() * 10000);
             }
@@ -871,14 +839,17 @@ class Game {
 
     private updateSmelting(deltaTime: number): void {
         const result = this.gameState.updateSmelting(deltaTime, this.SMELT_DURATION);
-        if (result) {
-            if (result.completed) {
-                this.showGameMessage(`+1 ${result.oreType} Ingot!`, 2000);
-                // No need to call updateInventoryDisplay() here if HUD handles its own updates
-                // this.updateInventoryDisplay();
+        if (result?.completed) {
+            this.showGameMessage(`+1 ${result.oreType} Ingot!`, 2000);
+
+            // FIX 4: Update UIs only when data changes.
+            if (this.forgeUi?.isVisible()) {
+                this.forgeUi.update(this.gameState);
             }
-            // The ForgeUI component's update is now handled in the main animate loop
-            // No need to call this.updateForgeUI(); here specifically
+            // CORRECTED: Check the GameState, which is the single source of truth.
+            if (this.gameState.isInventoryVisible && this.hud) {
+                this.hud.setInventory(this.gameState.getStructuredInventory());
+            }
         }
     }
 
@@ -896,7 +867,6 @@ class Game {
     }
 
     // --- UI Update Methods ---
-
     private showGameMessage(message: string, duration: number = 3000): void {
         const box = document.getElementById('message-box');
         if (box) {
@@ -906,59 +876,22 @@ class Game {
             if (this.messageTimeout) {
                 clearTimeout(this.messageTimeout);
             }
-            // TS-FIX: `setTimeout` in the browser returns a number, not a NodeJS.Timeout.
             this.messageTimeout = window.setTimeout(() => {
                 box.style.opacity = '0';
             }, duration);
         }
     }
 
-    private updateInventoryDisplay(): void {
-        const container = document.getElementById('inventory-display');
-        if (!container) return;
-
+    private updatePlayerStatsDisplay(): void {
+        if (!this.hud) return;
         const playerStats = this.gameState.getPlayerStats();
-
-        // --- HUD UPDATE LOGIC ---
-        // Calculate percentages and update the HUD component
         const healthPercent = (playerStats.health / playerStats.maxHealth) * 100;
-        // The armor percentage is now calculated within the HUD component.
-        // We pass the current armor and max health (as a reference for the bar's max).
-        this.hud?.setHealth(healthPercent);
-        this.hud?.setArmor(playerStats.armor, playerStats.maxHealth);
-        // --- END HUD UPDATE LOGIC ---
-
-        let html = `...`; // Same as your provided code
-        container.innerHTML = html; // Assume html is generated correctly
-
-        container.querySelectorAll('.equipment-item').forEach(item => {
-            item.addEventListener('click', () => {
-                const itemId = (item as HTMLElement).dataset.itemId;
-                if (itemId) this.showEquipmentDetails(itemId);
-            });
-        });
+        this.hud.setHealth(healthPercent);
+        this.hud.setArmor(playerStats.armor, playerStats.maxHealth);
     }
 
-    // private updateHealthDisplay(health: number, maxHealth: number): void {
-    //     // This method also ports directly from your JS, just needs null checks.
-    //     const healthBarElement = document.getElementById('health-bar');
-    //     const healthTextElement = document.getElementById('health-text');
-    //
-    //     if (healthBarElement && healthTextElement) {
-    //         const healthPercent = (health / maxHealth) * 100;
-    //         healthBarElement.style.width = `${healthPercent}%`;
-    //         healthTextElement.textContent = `${Math.floor(health)}/${maxHealth}`;
-    //         healthBarElement.style.backgroundColor = healthPercent > 60 ? '#22c55e' : healthPercent > 30 ? '#f59e0b' : '#ef4444';
-    //     }
-    // }
-
-    // --- Other UI Methods from JS ---
-    private showEquipmentDetails(itemId: string): void { /* ... similar migration ... */ }
-    private showEquipmentForSlot(slot: string): void { /* ... similar migration ... */ }
-    // private updateForgeUI(): void { /* ... similar migration ... */ } // Method removed as its functionality is now in ForgeUiComponent.update and game loop
-    private initializeForgeTabSystem(): void { /* ... similar migration ... */ }
-    private updateAlloyRecipes(): void { /* ... similar migration ... */ }
-    private updateEquipmentRecipes(category: string = 'weapons'): void { /* ... similar migration ... */ }
+    // FIX 6: Removed obsolete UI methods like showEquipmentDetails, showEquipmentForSlot, etc.
+    // Component-based UI handles its own internal logic.
 
     private handleWindowResize(): void {
         this.renderSystem?.handleWindowResize();
@@ -982,18 +915,8 @@ class Game {
         this.updateAction(deltaTime);
         this.updateSmelting(deltaTime);
 
-        if (this.gameState.isInventoryVisible && this.hud) {
-            this.hud.setInventory(this.gameState.getStructuredInventory());
-        }
-
-        // Update Forge UI if visible
-        if (this.forgeUi && this.forgeUi.isVisible()) {
-            this.forgeUi.update(this.gameState);
-        }
-        // Update Equipment UI if visible and gameState is loaded
-        if (this.equipmentUi && this.equipmentUi.isVisible() && this.gameState) {
-            this.equipmentUi.update(this.gameState);
-        }
+        // FIX 4: Removed per-frame UI updates from the game loop.
+        // Updates are now triggered by events (e.g., gathering, smelting, opening UI).
 
         if (this.player && this.renderSystem) {
             this.renderSystem.updateCameraPosition(
