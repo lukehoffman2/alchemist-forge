@@ -8,9 +8,8 @@ interface InputHandlerCallbacks {
     onAction?: () => void;
     onToggleTool?: () => void;
     onToggleForgeUI?: () => void;
-    onToggleEquipmentUI?: () => void; // Added for equipment UI
+    onToggleEquipmentUI?: () => void;
     onWindowResize?: () => void;
-    // We can add a new callback for the tool popup
     onToggleToolPopup?: () => void;
     onToggleInventory?: () => void;
 }
@@ -35,14 +34,13 @@ class InputHandler {
     private player: THREE.Group;
     private playerRotationSpeed: number;
     private callbacks: InputHandlerCallbacks;
-    private minPitch: number; // ADDED
-    private maxPitch: number; // ADDED
+    private minPitch: number;
+    private maxPitch: number;
 
     private qKeyTimer: number | null = null;
     private qKeyLongPressDetected: boolean = false;
     private readonly longPressThreshold: number = 300; // milliseconds
 
-    // UPDATED: The constructor now accepts minPitch and maxPitch
     constructor(
         gameState: GameState,
         player: THREE.Group,
@@ -54,8 +52,8 @@ class InputHandler {
         this.player = player;
         this.playerRotationSpeed = playerRotationSpeed;
         this.callbacks = {};
-        this.minPitch = minPitch; // ADDED
-        this.maxPitch = maxPitch; // ADDED
+        this.minPitch = minPitch;
+        this.maxPitch = maxPitch;
     }
 
     public setupEventListeners(): void {
@@ -198,10 +196,9 @@ class InputHandler {
         const movementX = event.movementX || 0;
         const movementY = event.movementY || 0;
 
-        // Player rotation (left/right) is still handled here
+        // Player rotation (left/right) is handled here
         this.player.rotation.y -= movementX * this.playerRotationSpeed;
 
-        // UPDATED: This block replaces the single erroneous line
         // 1. Calculate the potential new pitch
         const newPitch = this.gameState.cameraPitch - (movementY * this.playerRotationSpeed);
 
