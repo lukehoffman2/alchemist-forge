@@ -60,6 +60,7 @@ class InputHandler {
         document.addEventListener('keydown', (e) => this.onKeyDown(e));
         document.addEventListener('keyup', (e) => this.onKeyUp(e));
         document.addEventListener('mousemove', (e) => this.onMouseMove(e));
+        document.addEventListener('click', (e) => this.onMouseClick(e)); // Added this line
         window.addEventListener('resize', () => this.onWindowResize());
 
         document.getElementById('game-container')?.addEventListener('click', () => {
@@ -139,8 +140,6 @@ class InputHandler {
 
         this.gameState.setKeyPressed(key, true);
 
-        if (key === 'e') this.callbacks.onAction?.();
-
         // 'q' key long press logic
         if (key === 'q') {
             if (!this.qKeyTimer) { // Only start a new timer if one isn't already running
@@ -208,6 +207,19 @@ class InputHandler {
 
     private onWindowResize(): void {
         this.callbacks.onWindowResize?.();
+    }
+
+    private onMouseClick(event: MouseEvent): void {
+        // Check for left click (button === 0)
+        if (event.button !== 0) return;
+
+        if (
+            this.gameState.pointerLocked &&
+            !this.gameState.isPaused &&
+            !this.gameState.isInteracting
+        ) {
+            this.callbacks.onAction?.();
+        }
     }
 
     private async handleGeminiSubmit(): Promise<void> {
