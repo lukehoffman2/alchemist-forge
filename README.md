@@ -10,3 +10,6 @@ TODO
   - Need the ability to equip armor
   - Replace ore with better 3d assets
   - Replace pickaxe and axe with 3d assets
+  - implement rapier physics engine so that 3d assets have collision
+- Tests
+  - add game load time test, to make sure this isn't increasing significantly with new updates

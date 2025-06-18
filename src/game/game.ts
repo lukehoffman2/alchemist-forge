@@ -1,13 +1,14 @@
 // src/game/Game.ts
 
 import * as THREE from 'three';
-import GameState, { Tool, ActionTarget } from './GameState'; // Import the Tool type
+import GameState, { Tool, ActionTarget } from './GameState';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import Renderer from './Renderer';
 import InputHandler from './InputHandler';
 import { GameHudComponent, ToolInfo } from '../components/hud/game-hud';
 import { ForgeUiComponent } from '../components/forge/forge-ui';
 import { EquipmentUiComponent } from '../components/equipment/equipment-ui';
+import { LoadingScreenComponent } from '../components/loading/loading-screen';
 
 // This interface ensures that every ore type you define has the correct properties.
 interface OreType {
@@ -16,8 +17,8 @@ interface OreType {
     value: number;
     size: number;
     count: number;
+    modelPath?: string;
 }
-
 
 // It's good practice to define types for complex userData structures
 // to ensure consistency when you access them later.
@@ -40,6 +41,8 @@ interface CombatDummyUserData {
 class Game {
     private forgeUi: ForgeUiComponent | null = null;
     private equipmentUi: EquipmentUiComponent | null = null;
+    private loadingScreenComponent: LoadingScreenComponent | null = null;
+    private loadingManager: THREE.LoadingManager | null = null;
 
     // All class properties are now strongly typed.
     // We use `| null` to indicate properties that are initialized later.
@@ -51,7 +54,7 @@ class Game {
     private axe: THREE.Group | null = null;
     private forge: THREE.Group | null = null;
     private forgeLight: THREE.PointLight | null = null;
-    private ores: THREE.Mesh[] = [];
+    private ores: THREE.Object3D[] = [];
     private trees: THREE.Group[] = [];
     private combatDummy: THREE.Group | null = null;
     private hud: GameHudComponent | null = null;
@@ -71,12 +74,12 @@ class Game {
     private readonly INTERACTION_DISTANCE: number = 3.5;
     private readonly MAP_SIZE: number = 80;
     private readonly ORE_TYPES: Record<string, OreType> = {
-        COPPER: { name: 'copper', color: 0xb87333, value: 1, size: 0.8, count: 25 },
-        IRON: { name: 'iron', color: 0x808080, value: 1, size: 1, count: 20 },
-        GOLD: { name: 'gold', color: 0xFFD700, value: 1, size: 0.6, count: 15 },
-        SILVER: { name: 'silver', color: 0xC0C0C0, value: 1, size: 0.7, count: 15 },
-        MITHRIL: { name: 'mithril', color: 0x9bc4e2, value: 2, size: 0.9, count: 10 },
-        ADAMANTITE: { name: 'adamantite', color: 0x800080, value: 3, size: 1.1, count: 5 },
+        COPPER: { name: 'copper', color: 0xb87333, value: 1, size: 0.8, count: 25, modelPath: "src/assets/ores/3d/copper_ore.glb" },
+        IRON: { name: 'iron', color: 0x808080, value: 1, size: 1, count: 20, modelPath: "src/assets/ores/3d/iron_ore.glb" },
+        GOLD: { name: 'gold', color: 0xFFD700, value: 1, size: 0.6, count: 15, modelPath: "src/assets/ores/3d/gold_ore.glb" },
+        SILVER: { name: 'silver', color: 0xC0C0C0, value: 1, size: 0.7, count: 15, modelPath: "src/assets/ores/3d/silver_ore.glb" },
+        MITHRIL: { name: 'mithril', color: 0x9bc4e2, value: 2, size: 0.9, count: 10, modelPath: "src/assets/ores/3d/mithril_ore.glb" },
+        ADAMANTITE: { name: 'adamantite', color: 0x800080, value: 3, size: 1.1, count: 5, modelPath: "src/assets/ores/3d/adamantite_ore.glb" },
         OBSIDIAN: { name: 'obsidian', color: 0x310062, value: 2, size: 1.0, count: 8 }
     };
     private readonly TREE_COUNT: number = 40;
@@ -98,12 +101,13 @@ class Game {
     }
 
     public async init(): Promise<void> {
-        this.initScene();
+        this.initScene(); // loadingManager is created here
 
         await Promise.all([
             customElements.whenDefined('game-hud'),
             customElements.whenDefined('forge-ui'),
-            customElements.whenDefined('equipment-ui')
+            customElements.whenDefined('equipment-ui'),
+            customElements.whenDefined('loading-screen') // Ensure loading-screen is defined
         ]);
 
         // THE BELOW COMMENTS MAY BE USEFUL FOR DEBUGGING LATER
@@ -126,6 +130,17 @@ class Game {
         if (!this.hud) {
             console.error("Fatal: <game-hud> element not found in DOM!");
             return;
+        }
+
+        // Initialize Loading Screen Component
+        this.loadingScreenComponent = document.querySelector<LoadingScreenComponent>('loading-screen');
+        if (!this.loadingScreenComponent) {
+            console.error("Fatal: <loading-screen> element not found in DOM! Make sure it's in index.html.");
+            // No return here, as the game might still run, just without a loading screen.
+        } else {
+            // Proactively show loading screen
+            this.loadingScreenComponent.show();
+            this.loadingScreenComponent.updateProgress("Initializing game...", 0, 1);
         }
 
         // Find the ForgeUI component in the DOM
@@ -191,7 +206,36 @@ class Game {
         this.showGameMessage(`Equipped ${newTool}`, 1000);
     }
 
-    private initScene(): void {
+    private async initScene(): Promise<void> {
+        // Setup LoadingManager
+        this.loadingManager = new THREE.LoadingManager();
+        this.loadingManager.onStart = (url, itemsLoaded, itemsTotal) => {
+            if (this.loadingScreenComponent) {
+                this.loadingScreenComponent.show();
+                this.loadingScreenComponent.updateProgress(url, itemsLoaded, itemsTotal);
+            }
+            console.log(`Started loading: ${url} (${itemsLoaded}/${itemsTotal})`);
+        };
+        this.loadingManager.onProgress = (url, itemsLoaded, itemsTotal) => {
+            if (this.loadingScreenComponent) {
+                this.loadingScreenComponent.updateProgress(url, itemsLoaded, itemsTotal);
+            }
+            console.log(`Loading file: ${url} (${itemsLoaded}/${itemsTotal})`);
+        };
+        this.loadingManager.onLoad = () => {
+            if (this.loadingScreenComponent) {
+                this.loadingScreenComponent.hide();
+            }
+            console.log('All assets loaded.');
+            // Potentially trigger game start logic here if needed
+        };
+        this.loadingManager.onError = (url) => {
+            if (this.loadingScreenComponent) {
+                this.loadingScreenComponent.setError(`Error loading: ${url}`);
+            }
+            console.error(`Error loading file: ${url}`);
+        };
+
         this.scene = new THREE.Scene();
         this.scene.background = new THREE.Color(0x87ceeb);
         this.scene.fog = new THREE.Fog(0x87ceeb, this.MAP_SIZE * 0.5, this.MAP_SIZE * 1.8);
@@ -213,7 +257,7 @@ class Game {
         this.addLights();
         this.createGround();
         this.createPlayerAndTools();
-        this.createWorldResources();
+        await this.createWorldResources(); // Now async due to ore loading
 
         this.updatePlayerStatsDisplay();
     }
@@ -403,29 +447,84 @@ class Game {
         return tool;
     }
 
-    private createWorldResources(): void {
-        Object.values(this.ORE_TYPES).forEach(type => {
-            for (let i = 0; i < type.count; i++) {
-                const oreGeo = new THREE.DodecahedronGeometry(type.size * 0.6, 0);
-                const ore = new THREE.Mesh(
-                    oreGeo,
-                    new THREE.MeshStandardMaterial({
-                        color: type.color,
-                        metalness: 0.4,
-                        roughness: 0.7
-                    })
-                );
-                ore.position.set(
-                    (Math.random() - 0.5) * this.MAP_SIZE,
-                    type.size * 0.5,
-                    (Math.random() * 0.5) * this.MAP_SIZE - this.MAP_SIZE * 0.45
-                );
-                ore.castShadow = true;
-                ore.receiveShadow = true;
-                ore.userData = { type: type.name, resourceType: 'ore', respawnTimer: null } as ResourceUserData;
+    private async loadOreModel(type: OreType, loadingManager: THREE.LoadingManager): Promise<THREE.Object3D | null> {
+        const loader = new GLTFLoader(loadingManager);
 
-                this.scene!.add(ore);
-                this.ores.push(ore);
+        if (type.modelPath) {
+            const modelPath = type.modelPath; // Explicitly assign to a new const for type inference
+            return new Promise((resolve) => { // No reject needed as we always resolve with a fallback
+                loader.load(
+                    modelPath, // Use the new constant here
+                    (gltf) => {
+                        const model = gltf.scene;
+                        model.scale.set(0.5, 0.5, 0.5);
+                        model.position.set(
+                            (Math.random() - 0.5) * this.MAP_SIZE,
+                            type.size * 0.5,
+                            (Math.random() * 0.5) * this.MAP_SIZE - this.MAP_SIZE * 0.45
+                        );
+                        model.castShadow = true;
+                        model.receiveShadow = true;
+                        model.traverse(child => {
+                            if (child instanceof THREE.Mesh) {
+                                child.castShadow = true;
+                                child.receiveShadow = true;
+                            }
+                        });
+                        model.userData = { type: type.name, resourceType: 'ore', respawnTimer: null } as ResourceUserData;
+                        resolve(model);
+                    },
+                    undefined, // onProgress
+                    (error) => {
+                        console.error(`Error loading model for ${type.name}: `, error);
+                        const fallbackGeo = new THREE.DodecahedronGeometry(type.size * 0.6, 0);
+                        const fallbackMat = new THREE.MeshStandardMaterial({ color: type.color, metalness: 0.4, roughness: 0.7 });
+                        const fallbackMesh = new THREE.Mesh(fallbackGeo, fallbackMat);
+                        fallbackMesh.position.set(
+                            (Math.random() - 0.5) * this.MAP_SIZE,
+                            type.size * 0.5,
+                            (Math.random() * 0.5) * this.MAP_SIZE - this.MAP_SIZE * 0.45
+                        );
+                        fallbackMesh.castShadow = true;
+                        fallbackMesh.receiveShadow = true;
+                        fallbackMesh.userData = { type: type.name, resourceType: 'ore', respawnTimer: null } as ResourceUserData;
+                        resolve(fallbackMesh);
+                    }
+                );
+            });
+        } else {
+            // Create placeholder geometry directly if no modelPath
+            const oreGeo = new THREE.DodecahedronGeometry(type.size * 0.6, 0);
+            const oreMat = new THREE.MeshStandardMaterial({ color: type.color, metalness: 0.4, roughness: 0.7 });
+            const oreMesh = new THREE.Mesh(oreGeo, oreMat);
+            oreMesh.position.set(
+                (Math.random() - 0.5) * this.MAP_SIZE,
+                type.size * 0.5,
+                (Math.random() * 0.5) * this.MAP_SIZE - this.MAP_SIZE * 0.45
+            );
+            oreMesh.castShadow = true;
+            oreMesh.receiveShadow = true;
+            oreMesh.userData = { type: type.name, resourceType: 'ore', respawnTimer: null } as ResourceUserData;
+            return Promise.resolve(oreMesh);
+        }
+    }
+
+    private async createWorldResources(): Promise<void> {
+        const modelPromises: Promise<THREE.Object3D | null>[] = [];
+
+        Object.values(this.ORE_TYPES).forEach(type => {
+            // Create 'count' number of ore models for each type
+            for (let i = 0; i < type.count; i++) {
+                modelPromises.push(this.loadOreModel(type, this.loadingManager!));
+            }
+        });
+
+        const loadedModels = await Promise.all(modelPromises);
+
+        loadedModels.forEach(model => {
+            if (model) {
+                this.scene!.add(model);
+                this.ores.push(model);
             }
         });
 
@@ -460,7 +559,8 @@ class Game {
         }
 
         this.createCombatDummy();
-        this.createDetailedForge();
+        // Pass loadingManager to forge loading as well, if it uses GLTFLoader and needs to be tracked
+        this.createDetailedForge(this.loadingManager!);
     }
 
     private createCombatDummy(): void {
@@ -517,7 +617,7 @@ class Game {
         (this.combatDummy.userData as CombatDummyUserData).healthBar = healthBar;
     }
 
-    private createDetailedForge(): void {
+    private createDetailedForge(loadingManager: THREE.LoadingManager): void {
         this.forge = new THREE.Group();
         this.forge.position.set(0, 0, -10);
         this.scene!.add(this.forge);
@@ -525,7 +625,7 @@ class Game {
         this.forgeLight = new THREE.PointLight(0xffaa33, 2, 100);
         this.forgeLight.castShadow = true;
 
-        const loader = new GLTFLoader();
+        const loader = new GLTFLoader(loadingManager); // Use the passed loadingManager
         loader.load(
             'src/assets/forge.glb',
             (gltf) => {
