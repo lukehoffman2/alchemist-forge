@@ -173,8 +173,8 @@ class Game {
 
         // Initialize the HUD with our tool data
         const tools: ToolInfo[] = [
-            { id: 'pickaxe', name: 'Pickaxe', iconUrl: 'src/assets/icons/pickaxe.png' },
-            { id: 'axe', name: 'Axe', iconUrl: 'src/assets/icons/axe.png' }
+            { id: 'pickaxe', name: 'Pickaxe', iconUrl: 'src/assets/tools/icons/pickaxe.png' },
+            { id: 'axe', name: 'Axe', iconUrl: 'src/assets/tools/icons/axe.png' }
         ];
         this.hud.setTools(tools);
 
@@ -627,7 +627,7 @@ class Game {
 
         const loader = new GLTFLoader(loadingManager); // Use the passed loadingManager
         loader.load(
-            'src/assets/forge.glb',
+            'src/assets/buildings/3d/forge.glb',
             (gltf) => {
                 const modelScene = gltf.scene;
                 const desiredScale = 10;
