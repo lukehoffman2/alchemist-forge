@@ -13,9 +13,9 @@ export interface ToolInfo {
 
 export interface UIManagerCallbacks {
     onToolSelected: (toolId: Tool) => void;
-    onRequestToggleForgeUI: () => void; // Game will check distance etc.
+    onRequestToggleForgeUI: () => void;
     onRequestToggleEquipmentUI: () => void;
-    onRequestToggleToolPopup: () => boolean; // Game returns wasPointerLockedBeforePopup
+    onRequestToggleToolPopup: () => void;
     onHandlePointerLockForPopupClose: (wasPointerLockedBeforePopup: boolean) => void;
     onRequestToggleInventory: () => void;
     onPause: () => void; // For pause menu resume button
@@ -48,6 +48,9 @@ export class UIManager {
             customElements.whenDefined('equipment-ui'),
             customElements.whenDefined('loading-screen')
         ]);
+
+        this.equipmentUi?.addEventListener('equipment-ui-opened', () => this.handlePopupOpening());
+        this.equipmentUi?.addEventListener('equipment-ui-closed', () => this.handlePopupClosing());
 
         this.hud = document.querySelector<GameHudComponent>('game-hud');
         this.forgeUi = document.querySelector<ForgeUiComponent>('forge-ui');
@@ -95,6 +98,25 @@ export class UIManager {
         // Other pause menu buttons like "Exit" could be here or handled by Game if they have non-UI logic
     }
 
+    // Method to be called before ANY popup is shown
+    private handlePopupOpening(): void {
+        if (document.pointerLockElement) {
+            this.wasPointerLockedBeforePopup = true;
+            document.exitPointerLock();
+        } else {
+            this.wasPointerLockedBeforePopup = false;
+        }
+    }
+
+
+    // Method to be called after ANY popup is closed
+    private handlePopupClosing(): void {
+        if (this.wasPointerLockedBeforePopup && !this.gameState.isPaused) {
+            document.body.requestPointerLock();
+        }
+        this.wasPointerLockedBeforePopup = false; // Reset the flag
+    }
+
     // --- Loading Screen Methods ---
     public showLoadingScreen(): void {
         this.loadingScreenComponent?.show();
@@ -124,13 +146,13 @@ export class UIManager {
     public handleToggleToolPopupRequest(): void {
         if (this.hud?.isPopupVisible()) {
             this.hud.hideToolPopup();
-            this.gameState.isToolPopupVisible = false; // GameState needs to know
-            this.callbacks?.onHandlePointerLockForPopupClose(this.wasPointerLockedBeforePopup);
-            this.wasPointerLockedBeforePopup = false;
+            this.gameState.isToolPopupVisible = false;
+            this.handlePopupClosing(); // Use the centralized handler
         } else {
-            this.wasPointerLockedBeforePopup = this.callbacks?.onRequestToggleToolPopup() ?? false;
+            // No callback needed here, UIManager can handle it
+            this.handlePopupOpening(); // Use the centralized handler
             this.hud?.showToolPopup();
-            this.gameState.isToolPopupVisible = true; // GameState needs to know
+            this.gameState.isToolPopupVisible = true;
         }
     }
 
@@ -159,7 +181,13 @@ export class UIManager {
     }
 
     public setInventory(inventoryData: { resources: Record<string, number>, equipment: Record<string, any> }): void {
-        this.hud?.setInventory(inventoryData);
+        const hudInventoryData = {
+            resources: inventoryData.resources,
+            materials: {}
+        };
+
+        // Now we pass the correctly shaped object to the HUD.
+        this.hud?.setInventory(hudInventoryData);
     }
 
     // --- On-screen Messages ---
@@ -213,14 +241,6 @@ export class UIManager {
             if (document.pointerLockElement) document.exitPointerLock();
         } else if (!isAPanelVisible && wasAnyPanelVisible) {
             this.callbacks?.onHandlePointerLockForPopupClose(true); // Assume pointer should be re-locked by Game
-        }
-    }
-
-    public requestToggleForgeUI(): void {
-        if (this.forgeUi?.isVisible()) {
-            this.setActiveUIPanel('none');
-        } else {
-            this.callbacks?.onRequestToggleForgeUI(); // Game will check conditions
         }
     }
 

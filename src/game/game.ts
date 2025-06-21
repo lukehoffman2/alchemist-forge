@@ -7,11 +7,7 @@ import Renderer from './Renderer';
 import InputHandler from './InputHandler';
 import { WorldManager, ResourceUserData, CombatDummyUserData } from './WorldManager';
 import { PlayerManager } from './PlayerManager';
-import { UIManager, UIManagerCallbacks, ToolInfo } from './UIManager'; // Import UIManager
-// GameHudComponent, ForgeUiComponent etc. are now managed by UIManager internally.
-// ToolInfo is now imported from UIManager.
-
-// OreType is defined in WorldManager.ts and not used directly in Game.ts anymore.
+import { UIManager, UIManagerCallbacks } from './UIManager'; // Import UIManager
 
 class Game {
     // UI components (forgeUi, equipmentUi, loadingScreenComponent, hud) are now managed by UIManager.
@@ -44,7 +40,7 @@ class Game {
     // MAP_SIZE, ORE_TYPES, TREE_COUNT are now in WorldManager
 
     // Game systems
-    private gameState: GameState;
+    private readonly gameState: GameState;
     private renderSystem: Renderer | null = null;
     private inputHandler: InputHandler | null = null;
     // messageTimeout and wasPointerLockedBeforePopup are now managed by UIManager
@@ -64,22 +60,29 @@ class Game {
         this.uiManager = new UIManager(this.gameState);
 
         const uiManagerCallbacks: UIManagerCallbacks = {
+            // This is still needed for when a tool is selected from the popup
             onToolSelected: (toolId: Tool) => this.handleToolSelectionFromPopup(toolId),
-            onRequestToggleForgeUI: () => this.handleToggleForgeUIRequest(),
-            onRequestToggleEquipmentUI: () => this.handleToggleEquipmentUIRequest(),
-            onRequestToggleToolPopup: () => {
-                // This logic determines if pointer lock needs to be exited for the popup
-                if (document.pointerLockElement) {
-                    document.exitPointerLock();
-                    return true; // wasPointerLockedBeforePopup = true
-                }
-                return false; // wasPointerLockedBeforePopup = false
-            },
+
+            // UIManager calls this when it receives an input event to toggle the forge
+            onRequestToggleForgeUI: () => this.handleToggleForgeUI(),
+
+            // UIManager calls this for the equipment panel
+            onRequestToggleEquipmentUI: () => this.handleToggleEquipmentUI(),
+
+            // This is called from UIManager when a popup closes to handle re-locking the pointer
             onHandlePointerLockForPopupClose: (wasPointerLockedBeforePopup: boolean) => {
                 if (wasPointerLockedBeforePopup && !this.gameState.isPaused) {
                     document.body.requestPointerLock();
                 }
             },
+
+            // This is called by UIManager when it receives an input event to toggle the tool popup
+            onRequestToggleToolPopup: () => {
+                // We can now use the centralized logic in UIManager
+                this.uiManager?.handleToggleToolPopupRequest();
+            },
+
+            // This is for toggling the inventory display
             onRequestToggleInventory: () => {
                 const newVisibility = this.gameState.toggleInventoryVisibility();
                 this.uiManager?.toggleInventoryDisplay(newVisibility);
@@ -87,13 +90,23 @@ class Game {
                     this.uiManager?.setInventory(this.gameState.getStructuredInventory());
                 }
             },
+
+            // This allows the UI resume button to pause the game
             onPause: () => this.togglePause(),
         };
+
         await this.uiManager.init(uiManagerCallbacks);
 
-        this.initScene(); // loadingManager is created here, UIManager already has loadingScreenComponent reference
+        // --- FIX STARTS HERE ---
+        // Manually and proactively show the loading screen.
+        // This guarantees it is visible while the rest of the game initializes.
+        this.uiManager.showLoadingScreen();
+        this.uiManager.updateLoadingProgress("Initializing game systems...", 0, 1);
+        // --- FIX ENDS HERE ---
 
-        this.initRenderer(); // Depends on scene, camera
+        await this.initCoreGameSystems(); // loadingManager is created here, UIManager already has loadingScreenComponent reference
+
+        this.initRenderer(); // Depends on the scene and camera
         this.initInputHandler();
         this.setupCallbacks();
 
@@ -113,38 +126,46 @@ class Game {
         this.uiManager?.showGameMessage(`Equipped ${newTool}`, 1000);
     }
 
-    private async initScene(): Promise<void> {
-        // Setup LoadingManager
+    private async initCoreGameSystems(): Promise<void> {
+        // 1. Setup LoadingManager & Scene
         this.loadingManager = new THREE.LoadingManager();
+        // ... (loadingManager callbacks) ...
+
+        // The onStart callback no longer needs to call showLoadingScreen(),
+        // but it's perfect for updating the text to show what's loading.
         this.loadingManager.onStart = (url, itemsLoaded, itemsTotal) => {
-            this.uiManager?.showLoadingScreen();
             this.uiManager?.updateLoadingProgress(url, itemsLoaded, itemsTotal);
             console.log(`Started loading: ${url} (${itemsLoaded}/${itemsTotal})`);
         };
+
         this.loadingManager.onProgress = (url, itemsLoaded, itemsTotal) => {
             this.uiManager?.updateLoadingProgress(url, itemsLoaded, itemsTotal);
             console.log(`Loading file: ${url} (${itemsLoaded}/${itemsTotal})`);
         };
+
+        // This remains critical. It will hide the screen when all assets are loaded.
         this.loadingManager.onLoad = () => {
             this.uiManager?.hideLoadingScreen();
             console.log('All assets loaded.');
-        };
-        this.loadingManager.onError = (url) => {
-            this.uiManager?.setLoadingError(`Error loading: ${url}`);
-            console.error(`Error loading file: ${url}`);
         };
 
         this.scene = new THREE.Scene();
         this.scene.background = new THREE.Color(0x87ceeb);
 
+        // 2. Instantiate all managers
         this.worldManager = new WorldManager(this.scene, this.loadingManager!);
-        const mapSize = this.worldManager.getMapSize(); // For player boundary and fog
+        this.playerManager = new PlayerManager(this.scene!, this.gameState);
+
+        // 3. Set scene properties that depend on managers
+        const mapSize = this.worldManager.getMapSize();
         this.scene.fog = new THREE.Fog(0x87ceeb, mapSize * 0.5, mapSize * 1.8);
 
-        this.playerManager = new PlayerManager(this.scene!, this.gameState); // Init PlayerManager
+        // 4. Initialize managers and await async operations
+        this.playerManager.init(); // This is synchronous, creates the player object
+        await this.worldManager.init(); // This is async, loads models
 
+        // 5. Setup Camera and Renderer
         this.camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
-
         this.renderer = new THREE.WebGLRenderer({ antialias: true });
         this.renderer.setSize(window.innerWidth, window.innerHeight);
         this.renderer.shadowMap.enabled = true;
@@ -157,10 +178,8 @@ class Game {
             return;
         }
 
-        await this.worldManager.init();
-        this.playerManager.init(); // Call PlayerManager's init
-
-        this.updatePlayerStatsHud(); // Changed from updatePlayerStatsDisplay
+        // 6. Final HUD update
+        this.updatePlayerStatsHud();
     }
 
     private initRenderer(): void {
@@ -193,39 +212,26 @@ class Game {
         if (!this.inputHandler || !this.uiManager) return;
 
         this.inputHandler.setCallbacks({
-            onPause: () => this.togglePause(), // togglePause will call uiManager.togglePauseMenu
+            onPause: () => this.togglePause(),
             onAction: () => this.startAction(),
             onToggleTool: () => this.handleQuickToggleTool(),
-            // UI related toggles will now call methods on UIManager,
-            // which then use their own callbacks to Game if game logic is needed.
-            onToggleForgeUI: () => this.uiManager!.requestToggleForgeUI(),
-            onToggleEquipmentUI: () => this.uiManager!.requestToggleEquipmentUI(),
+            onToggleForgeUI: () => this.handleToggleForgeUI(),
+            onToggleEquipmentUI: () => this.handleToggleEquipmentUI(),
             onWindowResize: () => this.handleWindowResize(),
             onToggleToolPopup: () => this.uiManager!.handleToggleToolPopupRequest(),
             onToggleInventory: () => this.uiManager!.handleToggleInventoryRequest()
         });
-        // Event listener for 'tool-selected' is now set up inside UIManager.init
-        // UIManager will use the 'onToolSelected' callback.
     }
 
     // This method is now primarily game logic, UI interaction is handled by UIManager or its callbacks
     private handleToolSelectionFromPopup(selectedToolId: Tool): void {
         this.gameState.toggleTool(selectedToolId, true); // Game state update
         this.playerManager?.updateToolVisuals(selectedToolId); // Player 3D model update
-        this.uiManager?.setHudActiveTool(selectedToolId); // Inform HUD to update active tool
+        this.uiManager?.setHudActiveTool(selectedToolId);
         this.uiManager?.hideToolPopup(); // Hide the popup itself
         // Pointer lock logic is handled by UIManager callback
         this.uiManager?.showGameMessage(`Equipped ${selectedToolId}`, 1000);
     }
-
-    // --- World Creation Methods (moved to WorldManager) ---
-    // addLights, createGround, createWorldResources, loadOreModel,
-    // createCombatDummy, createDummyHealthBar, createDetailedForge, createFallbackForge
-    // are now removed from Game.ts
-
-    // createPlayerAndTools and createTool are moved to PlayerManager.ts
-
-    // All world creation methods previously here are now in WorldManager.ts
 
     // --- Game Action and UI Methods ---
     private addTestEquipment(): void {
@@ -260,15 +266,6 @@ class Game {
                  document.body.requestPointerLock();
              }
             this.lastTime = performance.now(); // Reset lastTime for deltaTime calculation
-        }
-    }
-
-    // This method is now mostly for game state and player model, UI message is handled by UIManager
-    private toggleTool(tool?: Tool, force: boolean = false): void {
-        const newTool = this.gameState.toggleTool(tool, force);
-        if (newTool) {
-            this.playerManager?.updateToolVisuals(newTool);
-            this.uiManager?.showGameMessage(`Equipped ${newTool}`, 1000);
         }
     }
 
@@ -359,25 +356,32 @@ class Game {
         }, 30000);
     }
 
-    // setActiveUIPanel, toggleForgeUI, toggleEquipmentUI are now primarily managed by UIManager.
-    // Game provides callbacks for UIManager to request these actions.
-    private handleToggleForgeUIRequest(): void {
+    private handleToggleForgeUI(): void {
+        // If the UI is already open, tell the manager to close it.
+        if (this.uiManager?.forgeUi?.isVisible()) {
+            this.uiManager.closeAllPanels(); // Or a more specific close method
+            return;
+        }
+
+        // Otherwise, run game logic to see IF we can open it.
         const currentPlayer = this.playerManager?.getPlayer();
         if (!currentPlayer || !this.worldManager?.forge) return;
 
-        // Game logic: Check distance to forge
         const distSq = currentPlayer.position.distanceToSquared(this.worldManager.forge.position);
         if (distSq < (this.INTERACTION_DISTANCE * this.INTERACTION_DISTANCE)) {
-            this.uiManager?.openForgeUI(); // Tell UIManager to actually open it
+            this.uiManager?.openForgeUI(); // Logic passed, tell UI to open.
         } else {
             this.uiManager?.showGameMessage("Forge is too far.", 1500);
         }
     }
 
-    private handleToggleEquipmentUIRequest(): void {
-        // No specific game logic here other than toggling, so UIManager can handle it.
-        // If there were checks (e.g., player can't open equipment in combat), they'd be here.
-        this.uiManager?.openEquipmentUI();
+    // New handler in Game.ts (replaces handleToggleEquipmentUIRequest)
+    private handleToggleEquipmentUI(): void {
+        if (this.uiManager?.equipmentUi?.isVisible()) {
+            this.uiManager.closeAllPanels();
+        } else {
+            this.uiManager?.openEquipmentUI();
+        }
     }
 
 
