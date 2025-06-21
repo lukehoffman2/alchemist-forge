@@ -3,66 +3,20 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>3D Ore Mining Game - v5</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
-    <link rel="stylesheet" href="css/styles.css">
+    <title>3D Ore Mining Game - Modular Edition</title>
 </head>
 <body>
+<loading-screen></loading-screen>
 <div id="game-container"></div>
-<div id="ui-overlay">
-    <!-- Inventory will be populated by JS -->
-    <div id="inventory-display"></div>
-    <div id="message-box"></div>
-    <div id="controls-info">
-        <p><strong>Controls:</strong></p>
-        <p>WASD/Arrows: Move</p>
-        <p>Mouse: Look/Turn</p>
-        <p>E: Use Tool</p>
-        <p>Q: Switch Tool</p>
-        <p>F: Open Forge Menu</p>
-        <p>ESC: Pause Game</p>
-    </div>
-    <!-- Forge UI -->
-    <div id="forge-ui">
-        <h3>Forge</h3>
-        <div class="forge-status">Fuel: <span id="forge-fuel-display">0</span> / 100</div>
-        <div class="progress-bar" style="margin-bottom: 1rem;"><div id="forge-fuel-bar" class="progress-bar-inner bg-red-500"></div></div>
-        <div class="forge-status">Status: <span id="smelting-status-display">Idle</span></div>
-        <div class="progress-bar" style="margin-bottom: 1rem;"><div id="smelting-progress-bar" class="progress-bar-inner"></div></div>
-        <div class="smelt-options">
-            <button class="smelt-button" data-ore="copper">Smelt Copper Ingot</button>
-            <button class="smelt-button mt-2" data-ore="iron">Smelt Iron Ingot</button>
-            <button class="smelt-button mt-2" data-ore="gold">Smelt Gold Ingot</button>
-        </div>
-        <button id="add-fuel-button" class="smelt-button mt-4">Add 10 Wood as Fuel</button>
-        <button id="gemini-open-button" class="smelt-button mt-4 bg-purple-600 hover:bg-purple-700">✨ Ask the Forge Master</button>
-    </div>
-</div>
-<div id="pause-menu">
-    <h2>Game Paused</h2>
-    <button id="resume-button" class="pause-button">Resume</button>
-    <button id="exit-button" class="pause-button">Exit Game</button>
-</div>
 
-<!-- Gemini Modal -->
-<div id="gemini-modal">
-    <div class="gemini-modal-content">
-        <h2>Ask the Forge Master</h2>
-        <p class="text-sm text-gray-400 mb-2">What do you wish to know, miner?</p>
-        <textarea id="gemini-prompt" placeholder="e.g., What should I make with my gold?"></textarea>
-        <div class="flex justify-end gap-4 mt-4">
-            <button id="gemini-close-button" class="pause-button" style="padding: 0.5rem 1rem; font-size: 1rem;">Close</button>
-            <button id="gemini-submit-button" class="pause-button bg-purple-600 hover:bg-purple-700" style="padding: 0.5rem 1rem; font-size: 1rem;">Ask</button>
-        </div>
-        <div id="gemini-response-container">
-            <p class="text-sm text-gray-400 mt-4 mb-1">The Forge Master says:</p>
-            <div id="gemini-response"></div>
-        </div>
-    </div>
-</div>
+<game-hud></game-hud>
+<forge-ui></forge-ui>
+<equipment-ui></equipment-ui>
+<pause-menu></pause-menu>
+<gemini-modal></gemini-modal>
 
-<script type="module" src="js/main.js"></script>
+<script type="module" src="src/components/loading/loading-screen.ts"></script>
+<script src="src/components/hud/game-hud.ts" type="module"></script>
+<script type="module" src="/src/game/main.ts"></script>
 </body>
 </html>
