@@ -1,4 +1,4 @@
-TODO
+TODOs
 
 - UI components
   - Combine equipment and inventory UI
