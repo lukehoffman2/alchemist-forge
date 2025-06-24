@@ -8,4 +8,6 @@ export default defineConfig({
 
     // The plugins array can be empty.
     plugins: [],
+
+    assetsInclude: ['**/*.glb'],
 });
