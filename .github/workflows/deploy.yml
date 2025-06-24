@@ -34,7 +34,7 @@ jobs:
         with:
           node-version: '20' # Specify the Node.js version you use
 
-      - name' Install dependencies
+      - name: Install dependencies
         run: npm install
 
       - name: Build project
