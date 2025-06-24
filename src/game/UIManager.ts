@@ -65,8 +65,8 @@ export class UIManager {
 
         // Initialize HUD tools
         const tools: ToolInfo[] = [
-            { id: 'pickaxe', name: 'Pickaxe', iconUrl: 'src/assets/tools/icons/pickaxe.png' },
-            { id: 'axe', name: 'Axe', iconUrl: 'src/assets/tools/icons/axe.png' }
+            { id: 'pickaxe', name: 'Pickaxe', iconUrl: 'public/assets/tools/icons/pickaxe.png' },
+            { id: 'axe', name: 'Axe', iconUrl: 'public/assets/tools/icons/axe.png' }
         ];
         this.hud.setTools(tools);
 
