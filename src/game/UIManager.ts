@@ -3,6 +3,8 @@ import { GameHudComponent } from '../components/hud/game-hud';
 import { ForgeUiComponent } from '../components/forge/forge-ui';
 import { EquipmentUiComponent } from '../components/equipment/equipment-ui';
 import { LoadingScreenComponent } from '../components/loading/loading-screen';
+import pickaxeIconUrl from '../assets/tools/icons/pickaxe.png';
+import axeIconUrl from '../assets/tools/icons/axe.png';
 
 // Moved from Game.ts - used by HUD
 export interface ToolInfo {
@@ -65,8 +67,8 @@ export class UIManager {
 
         // Initialize HUD tools
         const tools: ToolInfo[] = [
-            { id: 'pickaxe', name: 'Pickaxe', iconUrl: 'public/assets/tools/icons/pickaxe.png' },
-            { id: 'axe', name: 'Axe', iconUrl: 'public/assets/tools/icons/axe.png' }
+            { id: 'pickaxe', name: 'Pickaxe', iconUrl: pickaxeIconUrl },
+            { id: 'axe', name: 'Axe', iconUrl: axeIconUrl }
         ];
         this.hud.setTools(tools);
 

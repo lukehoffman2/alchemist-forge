@@ -1,5 +1,12 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import adamantiteOreModelUrl from '../assets/ores/3d/adamantite_ore.glb';
+import goldModelUrl from '../assets/ores/3d/gold_ore.glb';
+import copperOreModelUrl from '../assets/ores/3d/copper_ore.glb';
+import mithrilOreModelUrl from '../assets/ores/3d/mithril_ore.glb';
+import ironOreModelUrl from '../assets/ores/3d/iron_ore.glb';
+import silverOreModelUrl from '../assets/ores/3d/silver_ore.glb';
+import forgeModelUrl from '../assets/buildings/3d/forge.glb';
 
 // Interface for Ore Type definitions
 export interface OreType {
@@ -52,12 +59,12 @@ export class WorldManager {
     private readonly MAP_SIZE: number = 80;
     // ORE_TYPES definition from Game.ts
     private readonly ORE_TYPES: Record<string, OreType> = {
-        COPPER: { name: 'copper', color: 0xb87333, value: 1, size: 0.8, count: 25, modelPath: "public/assets/ores/3d/copper_ore.glb" },
-        IRON: { name: 'iron', color: 0x808080, value: 1, size: 1, count: 20, modelPath: "public/assets/ores/3d/iron_ore.glb" },
-        GOLD: { name: 'gold', color: 0xFFD700, value: 1, size: 0.6, count: 15, modelPath: "public/assets/ores/3d/gold_ore.glb" },
-        SILVER: { name: 'silver', color: 0xC0C0C0, value: 1, size: 0.7, count: 15, modelPath: "public/assets/ores/3d/silver_ore.glb" },
-        MITHRIL: { name: 'mithril', color: 0x9bc4e2, value: 2, size: 0.9, count: 10, modelPath: "public/assets/ores/3d/mithril_ore.glb" },
-        ADAMANTITE: { name: 'adamantite', color: 0x800080, value: 3, size: 1.1, count: 5, modelPath: "public/assets/ores/3d/adamantite_ore.glb" },
+        COPPER: { name: 'copper', color: 0xb87333, value: 1, size: 0.8, count: 25, modelPath: copperOreModelUrl },
+        IRON: { name: 'iron', color: 0x808080, value: 1, size: 1, count: 20, modelPath: ironOreModelUrl },
+        GOLD: { name: 'gold', color: 0xFFD700, value: 1, size: 0.6, count: 15, modelPath: goldModelUrl },
+        SILVER: { name: 'silver', color: 0xC0C0C0, value: 1, size: 0.7, count: 15, modelPath: silverOreModelUrl },
+        MITHRIL: { name: 'mithril', color: 0x9bc4e2, value: 2, size: 0.9, count: 10, modelPath: mithrilOreModelUrl },
+        ADAMANTITE: { name: 'adamantite', color: 0x800080, value: 3, size: 1.1, count: 5, modelPath: adamantiteOreModelUrl },
         OBSIDIAN: { name: 'obsidian', color: 0x310062, value: 2, size: 1.0, count: 8 } // No modelPath, will use fallback
     };
     private readonly TREE_COUNT: number = 40;
@@ -283,7 +290,7 @@ export class WorldManager {
 
         // GLTFLoader is already initialized with loadingManager in constructor
         this.gltfLoader.load(
-            'public/assets/buildings/3d/forge.glb',
+            forgeModelUrl,
             (gltf) => {
                 const modelScene = gltf.scene;
                 const desiredScale = 10;
