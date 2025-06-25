@@ -8,6 +8,10 @@ import InputHandler from './InputHandler';
 import { WorldManager, ResourceUserData, CombatDummyUserData } from './WorldManager';
 import { PlayerManager } from './PlayerManager';
 import { UIManager, UIManagerCallbacks } from './UIManager'; // Import UIManager
+import { ToolInfo } from '../components/hud/hud.types';
+import axeIconUrl from '../assets/tools/icons/axe.png';
+import pickaxeIconUrl from '../assets/tools/icons/pickaxe.png';
+
 
 class Game {
     // UI components (forgeUi, equipmentUi, loadingScreenComponent, hud) are now managed by UIManager.
@@ -97,6 +101,21 @@ class Game {
 
         await this.uiManager.init(uiManagerCallbacks);
 
+        // --- FIX REQUIRED TO PASS THE TEST ---
+        // 1. Define the complete set of tools available in the game.
+        //    NOTE: You'll need to import the 'ToolInfo' type.
+        //    Ensure these icon paths are correct relative to your application's public root.
+        const playerTools: ToolInfo[] = [
+            { id: 'axe', name: 'Axe', iconUrl: axeIconUrl },
+            { id: 'pickaxe', name: 'Pickaxe', iconUrl: pickaxeIconUrl }
+        ];
+
+        // 2. Get the tool the player starts with from the game state.
+        const startingTool = this.gameState.getEquippedTool();
+
+        // 3. Initialize the HUD with all tools and set the active one.
+        this.uiManager.setHudTools(playerTools, startingTool);
+
         // Populate inventory if it's visible by default
         if (this.gameState.isInventoryVisible) {
             this.uiManager.setInventory(this.gameState.getStructuredInventory());
@@ -124,10 +143,17 @@ class Game {
     public handleQuickToggleTool(): void {
         if (this.gameState.isInteracting) return;
 
-        this.uiManager?.updateHudQuickToggle(); // UIManager handles HUD visual swap
-        this.gameState.toggleTool(); // GameState handles logical swap
+        // 1. First, update the game's logical state.
+        this.gameState.toggleTool();
+
+        // 2. Get the NEW current tool from the state.
         const newTool = this.gameState.getEquippedTool();
-        this.playerManager?.updateToolVisuals(newTool); // PlayerManager handles 3D model
+
+        // 3. Tell the UI manager to set the active tool display to the new tool.
+        this.uiManager?.setHudActiveTool(newTool);
+
+        // 4. Update the player's 3D model and show the message (this part was already correct).
+        this.playerManager?.updateToolVisuals(newTool);
         this.uiManager?.showGameMessage(`Equipped ${newTool}`, 1000);
     }
 

@@ -22,9 +22,9 @@ inventoryPanelTemplate.innerHTML = `
         }
         .inventory-item { display: flex; justify-content: space-between; padding: 5px 0; font-size: 14px; }
         .inventory-item span:first-child { text-transform: capitalize; }
-        h4 {
+        h4 { 
             margin-top: 10px; border-top: 1px solid rgba(255,255,255,0.1);
-            padding-top: 10px; font-size: 1em;
+            padding-top: 10px; font-size: 1em; 
         }
         p.empty-message {
             text-align: center; font-size: 13px; color: rgba(255,255,255,0.6);
@@ -55,7 +55,7 @@ export class InventoryPanelComponent extends HTMLElement {
         const createItemElement = (name: string, count: number) => {
             const itemDiv = document.createElement('div');
             itemDiv.className = 'inventory-item';
-            itemDiv.innerHTML = \`<span>\${formatItemName(name)}</span><span>\${count}</span>\`;
+            itemDiv.innerHTML = `<span>${formatItemName(name)}</span><span>${count}</span>`;
             return itemDiv;
         };
 

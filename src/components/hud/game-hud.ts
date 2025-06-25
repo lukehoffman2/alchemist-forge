@@ -26,7 +26,7 @@ hudTemplate.innerHTML = `
     }
   </style>
 
-  <inventory-panel id="inventory-panel" hidden></inventory-panel>
+  <inventory-panel id="inventory-panel"></inventory-panel>
 
   <div class="bottom-hud">
     <tool-selector id="tool-selector"></tool-selector>

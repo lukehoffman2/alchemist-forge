@@ -45,12 +45,12 @@ export class StatusBarsComponent extends HTMLElement {
     }
 
     public setHealth(percentage: number): void {
-        this.healthBarFill.style.width = \`\${Math.max(0, Math.min(100, percentage))}%\`;
+        this.healthBarFill.style.width = `${Math.max(0, Math.min(100, percentage))}%`;
     }
 
     public setArmor(currentArmor: number, referenceMax: number): void {
         const percentage = referenceMax > 0 ? (currentArmor / referenceMax) * 100 : 0;
-        this.armorBarFill.style.width = \`\${Math.max(0, Math.min(100, percentage))}%\`;
+        this.armorBarFill.style.width = `${Math.max(0, Math.min(100, percentage))}%`;
     }
 }
 

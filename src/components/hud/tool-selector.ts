@@ -60,9 +60,14 @@ export class ToolSelectorComponent extends HTMLElement {
     }
 
     public setActiveTool(toolId: Tool): void {
+        if (!this.tools || this.tools.length === 0) {
+            console.warn('ToolSelector: setActiveTool called before setTools. Icon cannot be displayed.');
+            return;
+        }
+
         const tool = this.tools.find(t => t.id === toolId);
         if (tool) {
-            this.currentToolSlot.innerHTML = \`<img src="\${tool.iconUrl}" alt="\${tool.name}">\`;
+            this.currentToolSlot.innerHTML = `<img src="${tool.iconUrl}" alt="${tool.name}">`;
         }
     }
 
@@ -76,7 +81,7 @@ export class ToolSelectorComponent extends HTMLElement {
             const optionEl = document.createElement('div');
             optionEl.className = 'tool-option';
             optionEl.dataset.tool = tool.id;
-            optionEl.innerHTML = \`<img src="\${tool.iconUrl}" alt="\${tool.name}">\`;
+            optionEl.innerHTML = `<img src="${tool.iconUrl}" alt="${tool.name}">`;
             this.toolOptionsPopup.appendChild(optionEl);
         });
     }
