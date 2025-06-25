@@ -3,15 +3,7 @@ import { GameHudComponent } from '../components/hud/game-hud';
 import { ForgeUiComponent } from '../components/forge/forge-ui';
 import { EquipmentUiComponent } from '../components/equipment/equipment-ui';
 import { LoadingScreenComponent } from '../components/loading/loading-screen';
-import pickaxeIconUrl from '../assets/tools/icons/pickaxe.png';
-import axeIconUrl from '../assets/tools/icons/axe.png';
-
-// Moved from Game.ts - used by HUD
-export interface ToolInfo {
-    id: Tool;
-    name: string;
-    iconUrl: string;
-}
+import { ToolInfo } from '../components/hud/hud.types';
 
 export interface UIManagerCallbacks {
     onToolSelected: (toolId: Tool) => void;
@@ -65,13 +57,6 @@ export class UIManager {
             return;
         }
 
-        // Initialize HUD tools
-        const tools: ToolInfo[] = [
-            { id: 'pickaxe', name: 'Pickaxe', iconUrl: pickaxeIconUrl },
-            { id: 'axe', name: 'Axe', iconUrl: axeIconUrl }
-        ];
-        this.hud.setTools(tools);
-
         // Setup event listeners
         this.equipmentUi.addEventListener('equipment-ui-opened', () => {
             if (document.pointerLockElement) {
@@ -98,6 +83,10 @@ export class UIManager {
             this.callbacks?.onPause();
         });
         // Other pause menu buttons like "Exit" could be here or handled by Game if they have non-UI logic
+    }
+
+    public setHudTools(tools: ToolInfo[], currentToolId: Tool): void {
+        this.hud?.setTools(tools, currentToolId);
     }
 
     // Method to be called before ANY popup is shown
@@ -146,7 +135,7 @@ export class UIManager {
 
     // --- Tool Popup ---
     public handleToggleToolPopupRequest(): void {
-        if (this.hud?.isPopupVisible()) {
+        if (this.hud?.isToolPopupVisible()) {
             this.hud.hideToolPopup();
             this.gameState.isToolPopupVisible = false;
             this.handlePopupClosing(); // Use the centralized handler
@@ -167,10 +156,6 @@ export class UIManager {
         // this.gameState.isToolPopupVisible = false; // Game should manage this via callback if needed
     }
 
-    public updateHudQuickToggle(): void {
-        this.hud?.quickToggleTool();
-    }
-
     // --- Inventory Display ---
     public handleToggleInventoryRequest(): void {
         // This method is called from InputHandler.
@@ -182,14 +167,8 @@ export class UIManager {
         this.hud?.toggleInventoryDisplay(isVisible);
     }
 
-    public setInventory(inventoryData: { resources: Record<string, number>, equipment: Record<string, any> }): void {
-        const hudInventoryData = {
-            resources: inventoryData.resources,
-            materials: {}
-        };
-
-        // Now we pass the correctly shaped object to the HUD.
-        this.hud?.setInventory(hudInventoryData);
+    public setInventory(inventoryData: { resources: Record<string, number>, materials: Record<string, number> }): void {
+        this.hud?.setInventory(inventoryData);
     }
 
     // --- On-screen Messages ---
@@ -220,29 +199,26 @@ export class UIManager {
         const wasEquipmentVisible = this.equipmentUi?.isVisible() ?? false;
         const wasAnyPanelVisible = wasForgeVisible || wasEquipmentVisible;
 
-        this.forgeUi?.hide();
-        this.equipmentUi?.hide();
+        // Always hide all panels first
+        if (wasForgeVisible) this.forgeUi?.hide();
+        if (wasEquipmentVisible) this.equipmentUi?.hide();
 
-        // If inventory is considered a main panel that closes others:
-        if (this.hud && this.gameState.isInventoryVisible && panel !== 'none') {
-             this.callbacks?.onRequestToggleInventory(); // Request game to toggle it off
-        }
-
-        let isAPanelVisible = false;
-        if (panel === 'forge') {
+        let isAPanelOpening = false;
+        if (panel === 'forge' && !wasForgeVisible) {
             this.forgeUi?.show();
             this.forgeUi?.update(this.gameState);
-            isAPanelVisible = true;
-        } else if (panel === 'equipment') {
+            isAPanelOpening = true;
+        } else if (panel === 'equipment' && !wasEquipmentVisible) {
             this.equipmentUi?.show();
             this.equipmentUi?.update(this.gameState);
-            isAPanelVisible = true;
+            isAPanelOpening = true;
         }
 
-        if (isAPanelVisible && !wasAnyPanelVisible) {
-            if (document.pointerLockElement) document.exitPointerLock();
-        } else if (!isAPanelVisible && wasAnyPanelVisible) {
-            this.callbacks?.onHandlePointerLockForPopupClose(true); // Assume pointer should be re-locked by Game
+        // Consolidate pointer lock logic
+        const isClosingAPanel = wasAnyPanelVisible && !isAPanelOpening && panel === 'none';
+        if (isClosingAPanel) {
+            // handlePopupClosing is now called by the event listener on the component
+            // We just ensure the state is correct.
         }
     }
 

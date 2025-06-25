@@ -15,3 +15,6 @@ TODOs
   - add game load time test, to make sure this isn't increasing significantly with new updates
 - Documentation
   - document project layout
+  - create an agent.md file
+    - document coding principals like dry and single responsibility
+    - ask Gemini to review each file in my code and 1. tell me if it follows dry and single responsibility 2. if it is good document project structure )
