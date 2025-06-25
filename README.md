@@ -13,3 +13,5 @@ TODOs
   - implement rapier physics engine so that 3d assets have collision
 - Tests
   - add game load time test, to make sure this isn't increasing significantly with new updates
+- Documentation
+  - document project layout
