@@ -2,15 +2,15 @@
 
 import * as THREE from 'three';
 import GameState, { Tool, ActionTarget } from './GameState';
-// GLTFLoader might not be needed directly here if WorldManager handles all loading
 import Renderer from './Renderer';
 import InputHandler from './InputHandler';
 import { WorldManager, ResourceUserData, CombatDummyUserData } from './WorldManager';
 import { PlayerManager } from './PlayerManager';
-import { UIManager, UIManagerCallbacks } from './UIManager'; // Import UIManager
+import { UIManager, UIManagerCallbacks } from './UIManager';
 import { ToolInfo } from '../components/hud/hud.types';
 import axeIconUrl from '../assets/tools/icons/axe.png';
 import pickaxeIconUrl from '../assets/tools/icons/pickaxe.png';
+import { GeminiService } from '../services/GeminiService';
 
 
 class Game {
@@ -53,6 +53,8 @@ class Game {
     private animationFrameId: number | null = null;
     private lastTime: number = 0;
     // messageTimeout, wasPointerLockedBeforePopup moved to UIManager
+
+    private geminiService: GeminiService | null = null;
 
 
     constructor() {
@@ -97,14 +99,12 @@ class Game {
 
             // This allows the UI resume button to pause the game
             onPause: () => this.togglePause(),
+
+            onGeminiSubmit: (prompt: string) => this.handleGeminiRequest(prompt),
         };
 
         await this.uiManager.init(uiManagerCallbacks);
 
-        // --- FIX REQUIRED TO PASS THE TEST ---
-        // 1. Define the complete set of tools available in the game.
-        //    NOTE: You'll need to import the 'ToolInfo' type.
-        //    Ensure these icon paths are correct relative to your application's public root.
         const playerTools: ToolInfo[] = [
             { id: 'axe', name: 'Axe', iconUrl: axeIconUrl },
             { id: 'pickaxe', name: 'Pickaxe', iconUrl: pickaxeIconUrl }
@@ -227,8 +227,9 @@ class Game {
             console.error("Cannot init InputHandler: playerManager or player is missing.");
             return;
         }
-        // Pass the min and max pitch values to the constructor
-        // Also pass player object from PlayerManager and its rotation speed
+
+        this.geminiService = new GeminiService();
+
         this.inputHandler = new InputHandler(
             this.gameState,
             this.playerManager.getPlayer()!,
@@ -237,6 +238,20 @@ class Game {
             this.maxPitch
         );
         this.inputHandler.setupEventListeners();
+    }
+
+    private async handleGeminiRequest(prompt: string): Promise<void> {
+        const responseDiv = document.getElementById('gemini-response');
+        if (!responseDiv) return;
+
+        responseDiv.textContent = '';
+        responseDiv.classList.add('loading');
+
+        // The Game class now orchestrates the call to the service
+        const responseText = await this.geminiService!.getForgeMasterResponse(this.gameState, prompt);
+
+        responseDiv.textContent = responseText;
+        responseDiv.classList.remove('loading');
     }
 
     private setupCallbacks(): void {

@@ -66,7 +66,7 @@ export interface ActionTarget extends THREE.Object3D {
     }
 }
 
-class GameState {
+export class GameState {
     // TS-HINT: Now we apply our interfaces to the class properties.
     public inventory: Inventory;
     public player: PlayerState;

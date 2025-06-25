@@ -14,21 +14,6 @@ interface InputHandlerCallbacks {
     onToggleInventory?: () => void;
 }
 
-interface GeminiRequestPayload {
-    contents: {
-        role: "user",
-        parts: { text: string }[]
-    }[];
-}
-
-interface GeminiResponse {
-    candidates: {
-        content: {
-            parts: { text: string }[]
-        }
-    }[];
-}
-
 class InputHandler {
     private gameState: GameState;
     private player: THREE.Group;
@@ -74,48 +59,6 @@ class InputHandler {
             this.gameState.pointerLocked = !!document.pointerLockElement;
         });
 
-        // --- UI Element Event Listeners ---
-        document.getElementById('resume-button')?.addEventListener('click', () => {
-            this.callbacks.onPause?.();
-        });
-
-        document.getElementById('exit-button')?.addEventListener('click', () => window.location.reload());
-
-        document.getElementById('add-fuel-button')?.addEventListener('click', () => {
-            this.gameState.addForgeFuel(10);
-        });
-
-        document.querySelectorAll('.smelt-button[data-ore]').forEach(btn => {
-            btn.addEventListener('click', () => {
-                // ADDED: Cast to any to access dataset, then check if it's a valid ResourceName
-                const ore = (btn as any).dataset.ore;
-                if (ore) {
-                    // This will need a type guard if you want to be super strict, but this works
-                    this.gameState.startSmelting(ore);
-                }
-            });
-        });
-
-        document.getElementById('gemini-open-button')?.addEventListener('click', () => {
-            const geminiModal = document.getElementById('gemini-modal');
-            const geminiResponse = document.getElementById('gemini-response');
-            if (geminiModal && geminiResponse) {
-                geminiModal.style.display = 'flex';
-                geminiResponse.textContent = '...';
-                if (document.pointerLockElement) {
-                    document.exitPointerLock();
-                }
-            }
-        });
-
-        document.getElementById('gemini-close-button')?.addEventListener('click', () => {
-            const geminiModal = document.getElementById('gemini-modal');
-            if (geminiModal) {
-                geminiModal.style.display = 'none';
-            }
-        });
-
-        document.getElementById('gemini-submit-button')?.addEventListener('click', () => this.handleGeminiSubmit());
     }
 
     private onKeyDown(event: KeyboardEvent): void {
@@ -219,58 +162,6 @@ class InputHandler {
             !this.gameState.isInteracting
         ) {
             this.callbacks.onAction?.();
-        }
-    }
-
-    private async handleGeminiSubmit(): Promise<void> {
-        const promptInput = document.getElementById('gemini-prompt') as HTMLInputElement;
-        const responseDiv = document.getElementById('gemini-response');
-
-        if (!promptInput || !responseDiv) {
-            console.error("Gemini modal elements not found.");
-            return;
-        }
-
-        const userInput = promptInput.value;
-        if (!userInput) return;
-
-        responseDiv.textContent = '';
-        responseDiv.classList.add('loading');
-
-        const inventoryString = Object.entries(this.gameState.getStructuredInventory().resources)
-            .map(([key, value]) => `${key}: ${value}`)
-            .join(', ');
-
-        const fullPrompt = `You are the Forge Master, a wise, ancient, and slightly grumpy blacksmith in a fantasy world. A player comes to you for advice. Their inventory contains: ${inventoryString}. Their question is: "${userInput}". Give them a short, creative, in-character response. Offer helpful advice, but with the personality of a master craftsman who has seen it all. Keep your response to about 2-4 sentences.`;
-
-        const payload: GeminiRequestPayload = { contents: [{ role: "user", parts: [{ text: fullPrompt }] }] };
-
-        const apiKey = "";
-        const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${apiKey}`;
-
-        try {
-            const response = await fetch(apiUrl, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            });
-
-            if (!response.ok) {
-                throw new Error(`API request failed with status ${response.status}`);
-            }
-
-            const result: GeminiResponse = await response.json();
-            responseDiv.classList.remove('loading');
-
-            if (result.candidates && result.candidates.length > 0) {
-                responseDiv.textContent = result.candidates[0].content.parts[0].text;
-            } else {
-                responseDiv.textContent = "The Forge Master grunts, seemingly unimpressed by your question. Try asking again.";
-            }
-        } catch (error) {
-            console.error("Gemini API error:", error);
-            responseDiv.classList.remove('loading');
-            responseDiv.textContent = "The forge fire sputters and dies... something is wrong. (API Error)";
         }
     }
 

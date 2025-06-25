@@ -1,7 +1,7 @@
 // src/game/main.ts
 
 import '../styles/main.css';
-import Game from './game';
+import Game from './Game';
 
 // Import all custom element definitions so they get registered by the browser
 import '../components/hud/game-hud';        // <-- ADD THIS

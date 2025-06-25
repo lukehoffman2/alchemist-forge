@@ -12,7 +12,8 @@ export interface UIManagerCallbacks {
     onRequestToggleToolPopup: () => void;
     onHandlePointerLockForPopupClose: (wasPointerLockedBeforePopup: boolean) => void;
     onRequestToggleInventory: () => void;
-    onPause: () => void; // For pause menu resume button
+    onPause: () => void;
+    onGeminiSubmit?: (prompt: string) => void;
 }
 
 export class UIManager {
@@ -82,6 +83,51 @@ export class UIManager {
         document.getElementById('resume-button')?.addEventListener('click', () => {
             this.callbacks?.onPause();
         });
+
+        // Forge UI Buttons
+        document.getElementById('add-fuel-button')?.addEventListener('click', () => {
+            const success = this.gameState.addForgeFuel(10);
+            if (success) {
+                this.forgeUi?.update(this.gameState); // Keep UI in sync
+                this.showGameMessage("Added 10 fuel.", 1500);
+            } else {
+                this.showGameMessage("Not enough wood or forge is full.", 1500);
+            }
+        });
+
+        document.querySelectorAll('.smelt-button[data-ore]').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const ore = (btn as any).dataset.ore;
+                if (ore) {
+                    const success = this.gameState.startSmelting(ore);
+                    if (success) {
+                        this.forgeUi?.update(this.gameState);
+                        this.showGameMessage(`Smelting ${ore}...`, 2000);
+                    } else {
+                        this.showGameMessage(`Cannot smelt ${ore}. Check resources or forge status.`, 2000);
+                    }
+                }
+            });
+        });
+
+        // Gemini Modal Buttons
+        document.getElementById('gemini-open-button')?.addEventListener('click', () => {
+            document.getElementById('gemini-modal')?.style.setProperty('display', 'flex');
+            this.handlePopupOpening(); // Use existing helper
+        });
+
+        document.getElementById('gemini-close-button')?.addEventListener('click', () => {
+            document.getElementById('gemini-modal')?.style.setProperty('display', 'none');
+            this.handlePopupClosing(); // Use existing helper
+        });
+
+        document.getElementById('gemini-submit-button')?.addEventListener('click', () => {
+            const promptInput = document.getElementById('gemini-prompt') as HTMLInputElement;
+            if (promptInput && promptInput.value) {
+                this.callbacks?.onGeminiSubmit?.(promptInput.value);
+            }
+        });
+
         // Other pause menu buttons like "Exit" could be here or handled by Game if they have non-UI logic
     }
 
