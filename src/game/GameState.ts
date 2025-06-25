@@ -76,7 +76,7 @@ class GameState {
     public isPaused: boolean = false;
     public isInteracting: boolean = false;
     public isToolPopupVisible: boolean = false; // <-- ADD THIS LINE
-    public isInventoryVisible: boolean = false;
+    public isInventoryVisible: boolean = true;
     public actionProgress: number = 0;
     public currentActionTarget: ActionTarget | null = null;
 

@@ -97,6 +97,11 @@ class Game {
 
         await this.uiManager.init(uiManagerCallbacks);
 
+        // Populate inventory if it's visible by default
+        if (this.gameState.isInventoryVisible) {
+            this.uiManager.setInventory(this.gameState.getStructuredInventory());
+        }
+
         // --- FIX STARTS HERE ---
         // Manually and proactively show the loading screen.
         // This guarantees it is visible while the rest of the game initializes.
