@@ -157,7 +157,7 @@ hudTemplate.innerHTML = `
       border-radius: 10px;
       padding: 15px;
       color: white;
-      display: none; /* Hidden by default */
+      display: block; /* Visible by default */
       font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     }
     #inventory-panel h3 {
