@@ -47,6 +47,7 @@ export class WorldManager {
     private scene: THREE.Scene;
     private loadingManager: THREE.LoadingManager;
     private gltfLoader: GLTFLoader;
+    private modelCache: Map<string, THREE.Group> = new Map();
 
     // Properties moved from Game.ts
     public ores: THREE.Object3D[] = []; // In Game.ts it was THREE.Object3D[]
@@ -78,18 +79,58 @@ export class WorldManager {
     public async init(): Promise<void> {
         this.addLights();
         this.createGround();
-        await this.createWorldResources(); // This is async
+        await this.preloadModels();
+        this.createWorldResources();
         this.createCombatDummy();
-        // createDetailedForge needs loadingManager, it's available via this.loadingManager
         this.createDetailedForge();
+    }
+
+    private async preloadModels(): Promise<void> {
+        const modelPromises: Promise<void>[] = [];
+
+        const uniqueModelPaths = new Set<string>();
+        Object.values(this.ORE_TYPES).forEach(type => {
+            if (type.modelPath) {
+                uniqueModelPaths.add(type.modelPath);
+            }
+        });
+        uniqueModelPaths.add(forgeModelUrl);
+
+        uniqueModelPaths.forEach(path => {
+            modelPromises.push(this.loadGltfModel(path));
+        });
+
+        await Promise.all(modelPromises);
+        console.log("All unique models have been preloaded and cached.");
+    }
+
+    private loadGltfModel(modelPath: string): Promise<void> {
+        return new Promise((resolve) => {
+            if (this.modelCache.has(modelPath)) {
+                return resolve();
+            }
+            this.gltfLoader.load(
+                modelPath,
+                (gltf) => {
+                    this.modelCache.set(modelPath, gltf.scene);
+                    resolve();
+                },
+                undefined,
+                (error) => {
+                    console.error(`Error loading model from ${modelPath}:`, error);
+                    // Resolve even on error, so one failed model doesn't block others.
+                    // The create methods will handle the missing model from cache.
+                    resolve();
+                }
+            );
+        });
     }
 
     public getMapSize(): number {
         return this.MAP_SIZE;
     }
 
-    // --- World Creation Methods (Moved from Game.ts) ---
-    public addLights(): void { // Made public if Game needs to access it, otherwise private
+    public addLights(): void {
         this.scene.add(new THREE.AmbientLight(0xffffff, 0.7));
         const dirLight = new THREE.DirectionalLight(0xffffff, 0.9);
         dirLight.position.set(20, 40, 15);
@@ -106,7 +147,7 @@ export class WorldManager {
         this.scene.add(dirLight);
     }
 
-    public createGround(): void { // Made public for consistency, or private
+    public createGround(): void {
         const groundGeo = new THREE.PlaneGeometry(this.MAP_SIZE, this.MAP_SIZE);
         const groundMat = new THREE.MeshStandardMaterial({ color: 0x556B2F, roughness: 0.8 });
         const ground = new THREE.Mesh(groundGeo, groundMat);
@@ -115,82 +156,48 @@ export class WorldManager {
         this.scene.add(ground);
     }
 
-    private async loadOreModel(type: OreType): Promise<THREE.Object3D | null> {
-        // Uses this.gltfLoader (initialized from this.loadingManager)
-        if (type.modelPath) {
-            const modelPath = type.modelPath;
-            return new Promise((resolve) => {
-                this.gltfLoader.load(
-                    modelPath,
-                    (gltf) => {
-                        const model = gltf.scene;
-                        model.scale.set(0.5, 0.5, 0.5); // Example scale, adjust as needed
-                        model.position.set(
-                            (Math.random() - 0.5) * this.MAP_SIZE,
-                            type.size * 0.5, // Assumes size is diameter, place on ground
-                            (Math.random() * 0.5) * this.MAP_SIZE - this.MAP_SIZE * 0.45 // Spread them out
-                        );
-                        model.castShadow = true;
-                        model.receiveShadow = true;
-                        model.traverse(child => {
-                            if (child instanceof THREE.Mesh) {
-                                child.castShadow = true;
-                                child.receiveShadow = true;
-                            }
-                        });
-                        model.userData = { type: type.name, resourceType: 'ore', respawnTimer: null } as ResourceUserData;
-                        resolve(model);
-                    },
-                    undefined, // onProgress
-                    (error) => {
-                        console.error(`Error loading model for ${type.name}: `, error);
-                        const fallbackGeo = new THREE.DodecahedronGeometry(type.size * 0.6, 0);
-                        const fallbackMat = new THREE.MeshStandardMaterial({ color: type.color, metalness: 0.4, roughness: 0.7 });
-                        const fallbackMesh = new THREE.Mesh(fallbackGeo, fallbackMat);
-                        fallbackMesh.position.set(
-                            (Math.random() - 0.5) * this.MAP_SIZE,
-                            type.size * 0.5,
-                            (Math.random() * 0.5) * this.MAP_SIZE - this.MAP_SIZE * 0.45
-                        );
-                        fallbackMesh.castShadow = true;
-                        fallbackMesh.receiveShadow = true;
-                        fallbackMesh.userData = { type: type.name, resourceType: 'ore', respawnTimer: null } as ResourceUserData;
-                        resolve(fallbackMesh);
-                    }
-                );
-            });
-        } else {
-            const oreGeo = new THREE.DodecahedronGeometry(type.size * 0.6, 0);
-            const oreMat = new THREE.MeshStandardMaterial({ color: type.color, metalness: 0.4, roughness: 0.7 });
-            const oreMesh = new THREE.Mesh(oreGeo, oreMat);
-            oreMesh.position.set(
-                (Math.random() - 0.5) * this.MAP_SIZE,
-                type.size * 0.5,
-                (Math.random() * 0.5) * this.MAP_SIZE - this.MAP_SIZE * 0.45
-            );
-            oreMesh.castShadow = true;
-            oreMesh.receiveShadow = true;
-            oreMesh.userData = { type: type.name, resourceType: 'ore', respawnTimer: null } as ResourceUserData;
-            return Promise.resolve(oreMesh);
-        }
-    }
-
-    public async createWorldResources(): Promise<void> { // Made public for consistency
-        const modelPromises: Promise<THREE.Object3D | null>[] = [];
-
+    public createWorldResources(): void {
         Object.values(this.ORE_TYPES).forEach(type => {
+            const sourceModel = type.modelPath ? this.modelCache.get(type.modelPath) : undefined;
+
             for (let i = 0; i < type.count; i++) {
-                // loadOreModel now uses this.gltfLoader which has the loadingManager
-                modelPromises.push(this.loadOreModel(type));
-            }
-        });
+                let oreObject: THREE.Object3D;
 
-        const loadedModels = await Promise.all(modelPromises);
+                if (sourceModel) {
+                    const model = sourceModel.clone();
+                    model.scale.set(0.5, 0.5, 0.5);
+                    model.position.set(
+                        (Math.random() - 0.5) * this.MAP_SIZE,
+                        type.size * 0.5,
+                        (Math.random() * 0.5) * this.MAP_SIZE - this.MAP_SIZE * 0.45
+                    );
+                    model.castShadow = true;
+                    model.receiveShadow = true;
+                    model.traverse(child => {
+                        if (child instanceof THREE.Mesh) {
+                            child.castShadow = true;
+                            child.receiveShadow = true;
+                        }
+                    });
+                    oreObject = model;
+                } else {
+                    // Fallback for models that failed to load or don't have a path
+                    const oreGeo = new THREE.DodecahedronGeometry(type.size * 0.6, 0);
+                    const oreMat = new THREE.MeshStandardMaterial({ color: type.color, metalness: 0.4, roughness: 0.7 });
+                    const fallbackMesh = new THREE.Mesh(oreGeo, oreMat);
+                    fallbackMesh.position.set(
+                        (Math.random() - 0.5) * this.MAP_SIZE,
+                        type.size * 0.5,
+                        (Math.random() * 0.5) * this.MAP_SIZE - this.MAP_SIZE * 0.45
+                    );
+                    fallbackMesh.castShadow = true;
+                    fallbackMesh.receiveShadow = true;
+                    oreObject = fallbackMesh;
+                }
 
-        loadedModels.forEach(model => {
-            if (model) {
-                this.scene.add(model);
-                this.ores.push(model);
+                oreObject.userData = { type: type.name, resourceType: 'ore', respawnTimer: null } as ResourceUserData;
+                this.scene.add(oreObject);
+                this.ores.push(oreObject);
             }
         });
 
@@ -215,7 +222,7 @@ export class WorldManager {
             tree.add(leaves);
             tree.position.set(
                 Math.random() * 20 - 10 + forestX,
-                0, // Trees are placed at y=0, trunk height handles elevation
+                0,
                 Math.random() * 20 - 10 + forestZ
             );
             tree.userData = { type: 'tree', resourceType: 'wood', respawnTimer: null } as ResourceUserData;
@@ -225,25 +232,25 @@ export class WorldManager {
         }
     }
 
-    public createCombatDummy(): void { // Made public
+    public createCombatDummy(): void {
         this.combatDummy = new THREE.Group();
         const bodyGeometry = new THREE.BoxGeometry(1, 2, 1);
-        const bodyMaterial = new THREE.MeshStandardMaterial({ color: 0xef4444 }); // Red color
+        const bodyMaterial = new THREE.MeshStandardMaterial({ color: 0xef4444 });
         const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
-        body.position.y = 1; // Center of the body
+        body.position.y = 1;
         body.castShadow = true;
         body.receiveShadow = true;
         this.combatDummy.add(body);
 
-        const standGeometry = new THREE.CylinderGeometry(0.5, 0.7, 0.2, 8); // Wider base
-        const standMaterial = new THREE.MeshStandardMaterial({ color: 0x8B4513 }); // Wood color
+        const standGeometry = new THREE.CylinderGeometry(0.5, 0.7, 0.2, 8);
+        const standMaterial = new THREE.MeshStandardMaterial({ color: 0x8B4513 });
         const stand = new THREE.Mesh(standGeometry, standMaterial);
-        stand.position.y = 0.1; // Bottom of the stand
+        stand.position.y = 0.1;
         stand.castShadow = true;
         stand.receiveShadow = true;
         this.combatDummy.add(stand);
 
-        this.combatDummy.position.set(5, 0, -5); // Example position
+        this.combatDummy.position.set(5, 0, -5);
         this.combatDummy.userData = {
             type: 'enemy',
             name: 'Combat Dummy',
@@ -261,100 +268,91 @@ export class WorldManager {
         if (!this.combatDummy) return;
 
         const healthBarContainer = new THREE.Group();
-        const bgGeometry = new THREE.PlaneGeometry(1.2, 0.15); // Slightly larger for background
+        const bgGeometry = new THREE.PlaneGeometry(1.2, 0.15);
         const bgMaterial = new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.5 });
         const bgBar = new THREE.Mesh(bgGeometry, bgMaterial);
         healthBarContainer.add(bgBar);
 
-        const healthGeometry = new THREE.PlaneGeometry(1.2, 0.15); // Same size as background initially
-        const healthMaterial = new THREE.MeshBasicMaterial({ color: 0x22c55e }); // Green for health
+        const healthGeometry = new THREE.PlaneGeometry(1.2, 0.15);
+        const healthMaterial = new THREE.MeshBasicMaterial({ color: 0x22c55e });
         const healthBar = new THREE.Mesh(healthGeometry, healthMaterial);
-        healthBar.position.z = 0.01; // Slightly in front of the background
+        healthBar.position.z = 0.01;
         healthBarContainer.add(healthBar);
 
-        healthBarContainer.position.y = 3; // Position above the dummy
-        healthBarContainer.rotation.x = -Math.PI / 6; // Tilted for better visibility
+        healthBarContainer.position.y = 3;
+        healthBarContainer.rotation.x = -Math.PI / 6;
 
         this.combatDummy.add(healthBarContainer);
-        // Store the health bar mesh in userData to update it later
         (this.combatDummy.userData as CombatDummyUserData).healthBar = healthBar;
     }
 
-    public createDetailedForge(): void { // Made public
+    public createDetailedForge(): void {
         this.forge = new THREE.Group();
-        this.forge.position.set(0, 0, -10); // Example position
+        this.forge.position.set(0, 0, -10);
         this.scene.add(this.forge);
 
-        this.forgeLight = new THREE.PointLight(0xffaa33, 2, 100); // Intensity, distance
-        this.forgeLight.castShadow = true; // Shadows can be expensive
+        this.forgeLight = new THREE.PointLight(0xffaa33, 2, 100);
+        this.forgeLight.castShadow = true;
 
-        // GLTFLoader is already initialized with loadingManager in constructor
-        this.gltfLoader.load(
-            forgeModelUrl,
-            (gltf) => {
-                const modelScene = gltf.scene;
-                const desiredScale = 10;
-                modelScene.scale.set(desiredScale, desiredScale, desiredScale);
-                modelScene.position.y = 7; // Adjust based on model's origin
+        const forgeModel = this.modelCache.get(forgeModelUrl);
 
-                this.forge!.add(modelScene);
-                modelScene.traverse((node) => {
-                    if (node instanceof THREE.Mesh) {
-                        node.castShadow = true;
-                        node.receiveShadow = true;
-                    }
-                });
+        if (forgeModel) {
+            const modelScene = forgeModel.clone();
+            const desiredScale = 10;
+            modelScene.scale.set(desiredScale, desiredScale, desiredScale);
+            modelScene.position.y = 7;
 
-                // Attempt to find a specific object in the model to attach the light to
-                const forgeFire = modelScene.getObjectByName('ForgeFire'); // Use the actual name from your GLB
-                if (forgeFire && this.forgeLight) {
-                    forgeFire.add(this.forgeLight);
-                } else if (this.forgeLight) {
-                    // Fallback position if 'ForgeFire' isn't found
-                    this.forgeLight.position.set(0, 1.5, 0); // Adjust as needed
-                    this.forge!.add(this.forgeLight);
+            this.forge.add(modelScene);
+            modelScene.traverse((node) => {
+                if (node instanceof THREE.Mesh) {
+                    node.castShadow = true;
+                    node.receiveShadow = true;
                 }
-                console.log('Forge model loaded successfully');
-            },
-            undefined, // onProgress callback
-            (error) => {
-                console.error('An error happened loading the forge model:', error);
-                this.createFallbackForge(); // Create a simpler forge if loading fails
+            });
+
+            const forgeFire = modelScene.getObjectByName('ForgeFire');
+            if (forgeFire && this.forgeLight) {
+                forgeFire.add(this.forgeLight);
+            } else if (this.forgeLight) {
+                this.forgeLight.position.set(0, 1.5, 0);
+                this.forge.add(this.forgeLight);
             }
-        );
+            console.log('Forge model instance created from cache.');
+        } else {
+            console.error('Forge model not found in cache. Creating fallback forge.');
+            this.createFallbackForge();
+        }
     }
 
     private createFallbackForge(): void {
         console.log('Creating fallback forge');
-        if (!this.forge) return; // Should not happen if createDetailedForge was called
+        if (!this.forge) return;
 
-        // Clear any partially loaded model
         while (this.forge.children.length > 0) {
             this.forge.remove(this.forge.children[0]);
         }
 
         const forgeBase = new THREE.Mesh(
-            new THREE.BoxGeometry(4, 1, 4), // width, height, depth
-            new THREE.MeshStandardMaterial({ color: 0x888888 }) // Grey color
+            new THREE.BoxGeometry(4, 1, 4),
+            new THREE.MeshStandardMaterial({ color: 0x888888 })
         );
-        forgeBase.position.y = 0.5; // Half of height to sit on ground
+        forgeBase.position.y = 0.5;
         forgeBase.castShadow = true;
         this.forge.add(forgeBase);
 
         const forgeFire = new THREE.Mesh(
-            new THREE.BoxGeometry(2, 1, 2), // Smaller fire area
-            new THREE.MeshBasicMaterial({ color: 0xffaa33 }) // Orange/yellow fire color
+            new THREE.BoxGeometry(2, 1, 2),
+            new THREE.MeshBasicMaterial({ color: 0xffaa33 })
         );
-        forgeFire.position.y = 1.5; // Above the base
+        forgeFire.position.y = 1.5;
         this.forge.add(forgeFire);
 
-        // Ensure forgeLight is created if it wasn't (e.g. if detailed forge failed early)
         if (!this.forgeLight) {
             this.forgeLight = new THREE.PointLight(0xffaa33, 2, 100);
             this.forgeLight.castShadow = true;
         }
-        this.forgeLight.position.set(0, 0, 0); // Centered in the forgeFire mesh
-        forgeFire.add(this.forgeLight); // Add light to the fire mesh
+        this.forgeLight.position.set(0, 0, 0);
+        forgeFire.add(this.forgeLight);
     }
 
     public updateCombatDummyHealthBarVisuals(currentHealth: number, maxHealth: number): void {
@@ -362,16 +360,9 @@ export class WorldManager {
         const userData = this.combatDummy.userData as CombatDummyUserData;
         if (!userData.healthBar) return;
 
-        const healthPercent = Math.max(0, Math.min(1, currentHealth / maxHealth)); // Ensure percent is between 0 and 1
-        userData.healthBar.scale.x = healthPercent; // Health bar shrinks from right to left
-        // Adjust position to keep left side fixed, if health bar's origin is center
-        // userData.healthBar.position.x = - (1 - healthPercent) * (barWidth / 2);
-        // The original game.ts had: healthBar.position.x = -0.6 * (1 - healthPercent);
-        // This implies the bar is 1.2 units wide and its origin is its center.
-        // Let's assume the health bar's original full width corresponds to a scale of 1.
-        // If the health bar's geometry is 1.2 units wide, then position.x = - (1 - healthPercent) * 0.6;
+        const healthPercent = Math.max(0, Math.min(1, currentHealth / maxHealth));
+        userData.healthBar.scale.x = healthPercent;
         userData.healthBar.position.x = - (1 - healthPercent) * 0.6;
-
 
         const color = healthPercent > 0.6 ? 0x22c55e : healthPercent > 0.3 ? 0xf59e0b : 0xef4444;
         if (userData.healthBar.material instanceof THREE.MeshBasicMaterial) {
