@@ -54,34 +54,21 @@ export class InventoryPanelComponent extends HTMLElement {
         };
 
         const getItemIconPath = (itemName: string): string => {
-            // Simple mapping, assuming item names in inventory match icon file names (excluding extension)
-            // and are located in either ores or wood folders.
-            // e.g. "copperOre" -> "src/assets/ores/icons/copper_ore.png"
-            // e.g. "wood" -> "src/assets/wood/icon/wood.png"
             const basePath = "src/assets/";
             let folder = "ores/icons"; // Default to ores
             let fileName = itemName;
 
             if (itemName.toLowerCase().includes("wood")) {
                 folder = "wood/icon";
-                fileName = "wood"; // Assuming wood icon is just wood.png
+                fileName = "wood.png";
+            } else if (itemName.toLowerCase().includes("coal")) {
+                folder = "";
+                fileName = fileName.concat(".png");
             } else {
-                // Convert camelCase to snake_case for ore names
-                fileName = itemName.replace(/([A-Z])/g, "_$1").toLowerCase();
-                if (fileName.startsWith("_")) {
-                    fileName = fileName.substring(1);
-                }
+                fileName = fileName.concat("_ore.png");
             }
-            // Remove "ingot" from filename if present, as icons are for ores
-            fileName = fileName.replace(/_ingot$/, "_ore");
 
-
-            // Specific overrides if needed
-            if (itemName === "mitrhilOre") fileName = "mitrhil_ore"; // Correcting potential typo
-            if (itemName === "adamantiteOre") fileName = "adamantite_ore";
-
-
-            return `${basePath}${folder}/${fileName}.png`;
+            return `${basePath}${folder}/${fileName}`;
         };
 
         const createItemElement = (name: string, count: number) => {
