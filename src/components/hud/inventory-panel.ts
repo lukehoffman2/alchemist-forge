@@ -1,6 +1,30 @@
 // src/components/hud/inventory-panel.ts
 import { Inventory } from "./hud.types";
 
+// Import all inventory icons directly so Vite handles them correctly
+import coalIcon from '../../assets/coal.png';
+import woodIcon from '../../assets/wood/icon/wood.png';
+import adamantiteOreIcon from '../../assets/ores/icons/adamantite_ore.png';
+import copperOreIcon from '../../assets/ores/icons/copper_ore.png';
+import goldOreIcon from '../../assets/ores/icons/gold_ore.png';
+import ironOreIcon from '../../assets/ores/icons/iron_ore.png';
+import mithrilIcon from '../../assets/ores/icons/mithril.png';
+import obsidianOreIcon from '../../assets/ores/icons/obsidian_ore.png';
+import silverOreIcon from '../../assets/ores/icons/silver_ore.png';
+
+// Map item names to their imported icon URLs
+const iconMap: { [key: string]: string } = {
+    coal: coalIcon,
+    wood: woodIcon,
+    adamantite: adamantiteOreIcon,
+    copper: copperOreIcon,
+    gold: goldOreIcon,
+    iron: ironOreIcon,
+    mithril: mithrilIcon,
+    obsidian: obsidianOreIcon,
+    silver: silverOreIcon,
+};
+
 const inventoryPanelTemplate = document.createElement('template');
 inventoryPanelTemplate.innerHTML = `
     <style>
@@ -54,21 +78,9 @@ export class InventoryPanelComponent extends HTMLElement {
         };
 
         const getItemIconPath = (itemName: string): string => {
-            const basePath = "src/assets/";
-            let folder = "ores/icons"; // Default to ores
-            let fileName = itemName;
-
-            if (itemName.toLowerCase().includes("wood")) {
-                folder = "wood/icon";
-                fileName = "wood.png";
-            } else if (itemName.toLowerCase().includes("coal")) {
-                folder = "";
-                fileName = fileName.concat(".png");
-            } else {
-                fileName = fileName.concat("_ore.png");
-            }
-
-            return `${basePath}${folder}/${fileName}`;
+            // Use the pre-imported icon URLs from the map
+            const baseName = itemName.toLowerCase().replace(/_ore|_ingot/g, '');
+            return iconMap[baseName] || ''; // Return empty string if icon not found
         };
 
         const createItemElement = (name: string, count: number) => {
