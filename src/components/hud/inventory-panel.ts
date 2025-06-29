@@ -7,7 +7,7 @@ inventoryPanelTemplate.innerHTML = `
         /* All CSS related to the inventory panel goes here */
         :host {
             position: absolute; top: 20px; right: 20px;
-            width: 250px; max-height: 400px; overflow-y: auto;
+            width: 125px; max-height: 400px; overflow-y: auto;
             background-color: rgba(0, 0, 0, 0.7);
             border: 2px solid rgba(255, 255, 255, 0.3); border-radius: 10px;
             padding: 15px; color: white; display: block;
@@ -20,8 +20,9 @@ inventoryPanelTemplate.innerHTML = `
             border-bottom: 1px solid rgba(255, 255, 255, 0.2);
             padding-bottom: 10px; margin-bottom: 10px;
         }
-        .inventory-item { display: flex; justify-content: space-between; padding: 5px 0; font-size: 14px; }
-        .inventory-item span:first-child { text-transform: capitalize; }
+        .inventory-item { display: flex; justify-content: space-between; align-items: center; padding: 5px 0; font-size: 14px; }
+        .inventory-item img { width: 20px; height: 20px; margin-right: 8px; }
+        .inventory-item span:first-child { text-transform: capitalize; flex-grow: 1; }
         h4 { 
             margin-top: 10px; border-top: 1px solid rgba(255,255,255,0.1);
             padding-top: 10px; font-size: 1em; 
@@ -52,10 +53,41 @@ export class InventoryPanelComponent extends HTMLElement {
             return formatted.charAt(0).toUpperCase() + formatted.slice(1).trim();
         };
 
+        const getItemIconPath = (itemName: string): string => {
+            const basePath = "src/assets/";
+            let folder = "ores/icons"; // Default to ores
+            let fileName = itemName;
+
+            if (itemName.toLowerCase().includes("wood")) {
+                folder = "wood/icon";
+                fileName = "wood.png";
+            } else if (itemName.toLowerCase().includes("coal")) {
+                folder = "";
+                fileName = fileName.concat(".png");
+            } else {
+                fileName = fileName.concat("_ore.png");
+            }
+
+            return `${basePath}${folder}/${fileName}`;
+        };
+
         const createItemElement = (name: string, count: number) => {
             const itemDiv = document.createElement('div');
             itemDiv.className = 'inventory-item';
-            itemDiv.innerHTML = `<span>${formatItemName(name)}</span><span>${count}</span>`;
+
+            const icon = document.createElement('img');
+            icon.src = getItemIconPath(name);
+            icon.alt = formatItemName(name); // Alt text for accessibility
+
+            const nameSpan = document.createElement('span');
+            nameSpan.textContent = formatItemName(name);
+
+            const countSpan = document.createElement('span');
+            countSpan.textContent = `${count}`;
+
+            itemDiv.appendChild(icon);
+            itemDiv.appendChild(nameSpan);
+            itemDiv.appendChild(countSpan);
             return itemDiv;
         };
 
