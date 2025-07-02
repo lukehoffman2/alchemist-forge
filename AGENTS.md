@@ -3,7 +3,7 @@
 This document outlines the architecture of the game project to facilitate understanding and interaction by AI agents.
 
 ```
-game-project/
+alchemist-forge/
 ├── src/
 │   ├── components/
 │   │   ├── hud/
@@ -25,6 +25,16 @@ game-project/
 │   │   └── WorldManager.ts   # Manages the game world and its objects.
 │   ├── services/
 │   │   └── GeminiService.ts # Handles communication with the Gemini API.
+```
+
+Ignore the following directories:
+
+```aiignore
+alchemist-forge/
+├── .github/
+├── .idea/
+├── .dist/
+├── node_modules/
 ```
 
 ## Guiding Principles
