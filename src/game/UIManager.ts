@@ -72,6 +72,10 @@ export class UIManager {
             this.wasPointerLockedBeforePopup = false;
         });
 
+        this.forgeUi.addEventListener('forge-closed', () => {
+            this.closeAllPanels();
+        });
+
         this.hud.addEventListener('tool-selected', (event: Event) => {
             const customEvent = event as CustomEvent<{ toolId: Tool }>;
             if (customEvent.detail && customEvent.detail.toolId) {
@@ -129,6 +133,13 @@ export class UIManager {
         });
 
         // Other pause menu buttons like "Exit" could be here or handled by Game if they have non-UI logic
+        window.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                if (this.forgeUi?.isVisible()) {
+                    this.closeAllPanels();
+                }
+            }
+        });
     }
 
     public setHudTools(tools: ToolInfo[], currentToolId: Tool): void {
@@ -261,10 +272,13 @@ export class UIManager {
         }
 
         // Consolidate pointer lock logic
+        if (isAPanelOpening) {
+            this.handlePopupOpening();
+        }
+
         const isClosingAPanel = wasAnyPanelVisible && !isAPanelOpening && panel === 'none';
         if (isClosingAPanel) {
-            // handlePopupClosing is now called by the event listener on the component
-            // We just ensure the state is correct.
+            this.handlePopupClosing();
         }
     }
 

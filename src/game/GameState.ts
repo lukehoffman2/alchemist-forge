@@ -11,7 +11,7 @@ import * as THREE from 'three'; // <--- ADD THIS LINE
 export type ResourceName = 'wood' | 'copper' | 'iron' | 'gold' | 'silver' | 'mithril' | 'adamantite' | 'obsidian' | 'coal';
 type AlloyName = 'bronzeIngot' | 'steelIngot' | 'electrumIngot' | 'mithrilSteelIngot' | 'adamantiteSteelIngot';
 type BasicIngotName = 'copperIngot' | 'ironIngot' | 'goldIngot' | 'silverIngot' | 'mithrilIngot' | 'adamantiteIngot' | 'workedObsidian';
-type MaterialName = BasicIngotName | AlloyName;
+export type MaterialName = BasicIngotName | AlloyName;
 
 type EquipmentType = 'weapon' | 'shield' | 'helmet' | 'chestplate' | 'leggings' | 'gauntlets' | 'boots';
 export type EquipmentSlot = 'head' | 'chest' | 'legs' | 'hands' | 'feet' | 'mainHand' | 'offHand';
