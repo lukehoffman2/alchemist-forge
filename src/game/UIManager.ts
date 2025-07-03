@@ -133,13 +133,6 @@ export class UIManager {
         });
 
         // Other pause menu buttons like "Exit" could be here or handled by Game if they have non-UI logic
-        window.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape') {
-                if (this.forgeUi?.isVisible()) {
-                    this.closeAllPanels();
-                }
-            }
-        });
     }
 
     public setHudTools(tools: ToolInfo[], currentToolId: Tool): void {

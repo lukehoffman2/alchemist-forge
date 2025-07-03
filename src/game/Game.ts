@@ -98,7 +98,7 @@ class Game {
             },
 
             // This allows the UI resume button to pause the game
-            onPause: () => this.togglePause(),
+            onPause: (event?: KeyboardEvent) => this.togglePause(event),
 
             onGeminiSubmit: (prompt: string) => this.handleGeminiRequest(prompt),
         };
@@ -299,18 +299,51 @@ class Game {
         this.updatePlayerStatsHud();
     }
 
-    private togglePause(): void {
+    private togglePause(event?: KeyboardEvent): void {
+        // If the Escape key was pressed and the forge UI is currently visible,
+        // close the forge UI and do not pause the game.
+        if (event?.key === 'Escape' && this.uiManager?.forgeUi?.isVisible()) {
+            this.uiManager.closeAllPanels(); // This will hide the forge UI
+            return; // Explicitly return to prevent pausing
+        }
+
+        // If the Escape key was pressed and the equipment UI is currently visible,
+        // close the equipment UI and do not pause the game.
+        if (event?.key === 'Escape' && this.uiManager?.equipmentUi?.isVisible()) {
+            this.uiManager.closeAllPanels(); // This will hide the equipment UI
+            return; // Explicitly return to prevent pausing
+        }
+
+        // If the Escape key was pressed and the tool popup is currently visible,
+        // hide the tool popup and do not pause the game.
+        if (event?.key === 'Escape' && this.uiManager?.hud?.isToolPopupVisible()) {
+            this.uiManager.handleToggleToolPopupRequest(); // This will hide the popup
+            return; // Explicitly return to prevent pausing
+        }
+
+        // If the Escape key was pressed and the inventory is currently visible,
+        // hide the inventory and do not pause the game.
+        if (event?.key === 'Escape' && this.gameState.isInventoryVisible) {
+            this.uiManager?.handleToggleInventoryRequest(); // This will hide the inventory
+            return; // Explicitly return to prevent pausing
+        }
+
+
+        // Proceed with pausing/unpausing if none of the above conditions were met,
+        // or if togglePause was called without an Escape event (e.g., resume button).
         const isPaused = this.gameState.togglePause();
         this.uiManager?.togglePauseMenu(isPaused);
 
         if (isPaused) {
             if (document.pointerLockElement) document.exitPointerLock();
         } else {
-            // UIManager's setActiveUIPanel or specific panel toggle methods handle pointer lock on close.
-            // For resume, we might need to explicitly request pointer lock if no other UI is open.
-             if (!this.uiManager?.forgeUi?.isVisible() && !this.uiManager?.equipmentUi?.isVisible()) {
-                 document.body.requestPointerLock();
-             }
+            // Only request pointer lock if no major UI panel is open
+            if (!this.uiManager?.forgeUi?.isVisible() &&
+                !this.uiManager?.equipmentUi?.isVisible() &&
+                !this.uiManager?.hud?.isToolPopupVisible() &&
+                !this.gameState.isInventoryVisible) {
+                document.body.requestPointerLock();
+            }
             this.lastTime = performance.now(); // Reset lastTime for deltaTime calculation
         }
     }
