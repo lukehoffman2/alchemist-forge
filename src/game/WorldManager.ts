@@ -1,5 +1,6 @@
 import * as THREE from 'three';
-import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader';
+import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader';
 import adamantiteOreModelUrl from '../assets/ores/3d/adamantite_ore.glb';
 import goldModelUrl from '../assets/ores/3d/gold_ore.glb';
 import copperOreModelUrl from '../assets/ores/3d/copper_ore.glb';
@@ -74,6 +75,9 @@ export class WorldManager {
         this.scene = scene;
         this.loadingManager = loadingManager;
         this.gltfLoader = new GLTFLoader(this.loadingManager);
+        const dracoLoader = new DRACOLoader();
+        dracoLoader.setDecoderPath('https://www.gstatic.com/draco/v1/decoders/');
+        this.gltfLoader.setDRACOLoader(dracoLoader);
     }
 
     public async init(): Promise<void> {
