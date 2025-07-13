@@ -258,7 +258,7 @@ class Game {
         if (!this.inputHandler || !this.uiManager) return;
 
         this.inputHandler.setCallbacks({
-            onPause: () => this.togglePause(),
+            onPause: (event) => this.togglePause(event),
             onAction: () => this.startAction(),
             onToggleTool: () => this.handleQuickToggleTool(),
             onToggleForgeUI: () => this.handleToggleForgeUI(),

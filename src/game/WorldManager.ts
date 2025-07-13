@@ -302,9 +302,9 @@ export class WorldManager {
 
         if (forgeModel) {
             const modelScene = forgeModel.clone();
-            const desiredScale = 10;
+            const desiredScale = 5.5;
             modelScene.scale.set(desiredScale, desiredScale, desiredScale);
-            modelScene.position.y = 7;
+            modelScene.position.y = 3.5;
 
             this.forge.add(modelScene);
             modelScene.traverse((node) => {
