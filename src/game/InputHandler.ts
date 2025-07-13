@@ -4,7 +4,7 @@ import * as THREE from 'three';
 import GameState from './GameState';
 
 interface InputHandlerCallbacks {
-    onPause?: () => void;
+    onPause?: (event?: KeyboardEvent) => void;
     onAction?: () => void;
     onToggleTool?: () => void;
     onToggleForgeUI?: () => void;
@@ -65,7 +65,7 @@ class InputHandler {
         const key = event.key.toLowerCase();
 
         if (key === 'escape') {
-            this.callbacks.onPause?.();
+            this.callbacks.onPause?.(event);
             return;
         }
 
